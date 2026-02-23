@@ -460,8 +460,8 @@ html, body {
 
 /* Chat panel */
 .chat-panel {
-  width: 520px;
-  height: 580px;
+  width: 560px;
+  height: 540px;
   background: var(--white);
   border-radius: 22px;
   box-shadow: 0 20px 70px rgba(0,0,0,.22);
