@@ -1,0 +1,8 @@
+# Source/knowledge base files — not needed in deployed repo
+API/
+Knowledge bases/
+Main prompt currently using.txt
+obs_ranges.txt
+.claude/
+*.docx
+*.pdf
