@@ -714,7 +714,7 @@ function appendMessage(role, text) {
   const avatarEl = document.createElement("div");
   if (isBot) {
     const img = document.createElement("img");
-    img.src = "images/ChatBot.png";
+    img.src = "chatbot_image/chatbot.png";
     img.alt = "CareBridge";
     img.className = "msg-avatar";
     avatarEl.appendChild(img);
@@ -764,7 +764,7 @@ function showWelcomeCard(name) {
   const container = document.getElementById("messages");
   container.innerHTML = `
     <div class="welcome-card">
-      <img src="images/ChatBot.png" alt="CareBridge" />
+      <img src="chatbot_image/chatbot.png" alt="CareBridge" />
       <h3>Hey ${name}, how can I assist you today?</h3>
       <p>Search patient records, retrieve lab results, conditions, medications, encounters, and procedures.</p>
       <div class="welcome-chips">
