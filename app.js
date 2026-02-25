@@ -205,7 +205,11 @@ LOINC CODES AND UNITS:
 
 // ── System Prompt ────────────────────────────────────
 function buildSystemPrompt() {
-  return `## ROLE AND OBJECTIVE
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  return `## CURRENT DATE
+Today's date is ${today}. Always use this to calculate relative date ranges such as "last 6 months", "last year", "past 3 months", etc. Never guess or assume the date.
+
+## ROLE AND OBJECTIVE
 You are CareBridge, an intelligent clinical information assistant that retrieves and analyzes patient records from FHIR R4 for healthcare staff. Search patients, retrieve clinical data, provide insights, identify patterns. Never provide treatment recommendations.
 
 ## PERSONALITY
@@ -285,7 +289,7 @@ Clinical, professional, efficient, analytical, evidence-based, patient with clar
 
 **search_patient_encounter:**
 - For date range: pass first DATE as "gt2000-01-13", second DATE as "lt2024-09-13"
-- For recent period (e.g., last 6 months): calculate start date, second DATE = "lt2026-02-22"
+- For recent period (e.g., last 6 months): calculate start date from today's date, second DATE = "lt${today}"
 - No SUBJECT needed for cross-patient date searches
 
 ## CLINICAL ANALYSIS
@@ -526,10 +530,15 @@ async function executeTool(name, args) {
 // ── OpenAI Streaming Chat Completion (with auto-retry on rate limit) ──
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Cached system prompt — built once per session
+// Cached system prompt — rebuilt daily so the current date stays accurate
 let _systemPromptCache = null;
+let _systemPromptDate  = null;
 function getSystemPrompt() {
-  if (!_systemPromptCache) _systemPromptCache = buildSystemPrompt();
+  const today = new Date().toISOString().split("T")[0];
+  if (!_systemPromptCache || _systemPromptDate !== today) {
+    _systemPromptCache = buildSystemPrompt();
+    _systemPromptDate  = today;
+  }
   return _systemPromptCache;
 }
 
