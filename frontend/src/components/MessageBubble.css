@@ -1,0 +1,135 @@
+/* ── Row layout ──────────────────────────────────────────────────────────── */
+.msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+}
+
+.msg-row.user { flex-direction: row-reverse; }
+
+/* ── Avatars ─────────────────────────────────────────────────────────────── */
+.msg-avatar-wrap { flex-shrink: 0; }
+
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e8f0fe;
+  padding: 3px;
+  display: block;
+}
+
+.user-av-wrap {}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Wrapper (bubble + timestamp) ──────────────────────────────────────── */
+.msg-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+}
+
+.msg-row.user .msg-wrapper { align-items: flex-end; }
+.msg-row.bot  .msg-wrapper { align-items: flex-start; }
+
+/* ── Bubbles ─────────────────────────────────────────────────────────────── */
+.msg-bubble {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: break-word;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.bot-bubble {
+  background: #fff;
+  color: #1a202c;
+  border-radius: 4px 16px 16px 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  /* Important: white-space:normal so marked.js HTML renders correctly */
+  white-space: normal;
+}
+
+.user-bubble {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: #fff;
+  border-radius: 16px 4px 16px 16px;
+  white-space: pre-wrap;
+}
+
+/* ── Streaming cursor ─────────────────────────────────────────────────────── */
+.streaming { opacity: 0.95; }
+
+.cursor-blink {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+  margin-left: 1px;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Markdown inside bot bubble ──────────────────────────────────────────── */
+.bot-bubble p          { margin: 0 0 6px; }
+.bot-bubble p:last-child { margin-bottom: 0; }
+.bot-bubble ul,
+.bot-bubble ol         { padding-left: 20px; margin: 6px 0; }
+.bot-bubble li         { margin-bottom: 4px; }
+.bot-bubble li p       { margin: 0; padding: 0; }  /* remove "loose list" gaps */
+.bot-bubble strong     { color: #1a202c; }
+.bot-bubble code       { background: #f0f4ff; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+.bot-bubble pre        { background: #f0f4ff; padding: 10px; border-radius: 6px; overflow-x: auto; }
+.bot-bubble table      { border-collapse: collapse; width: 100%; font-size: 0.85em; }
+.bot-bubble th,
+.bot-bubble td         { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
+.bot-bubble th         { background: #f7faff; font-weight: 600; }
+
+/* ── Timestamp ──────────────────────────────────────────────────────────── */
+.msg-time {
+  font-size: 0.7rem;
+  color: #a0aec0;
+  margin-top: 3px;
+  padding: 0 4px;
+}
+
+/* ── Typing indicator ─────────────────────────────────────────────────────── */
+.typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  min-width: 56px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  background: #93c5fd;
+  border-radius: 50%;
+  display: inline-block;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40%           { transform: scale(1);   opacity: 1; }
+}

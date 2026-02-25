@@ -1,8 +1,36 @@
-# Source/knowledge base files — not needed in deployed repo
+# ── Backend ──────────────────────────────────────────
+backend/target/
+backend/.mvn/
+backend/*.iml
+
+# ── Frontend ─────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# ── Environment / Secrets ────────────────────────────
+.env
+*.env
+application-local.properties
+
+# ── IDE ──────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Claude / project-specific ────────────────────────
+.claude/
 API/
 Knowledge bases/
 Main prompt currently using.txt
 obs_ranges.txt
-.claude/
 *.docx
 *.pdf
