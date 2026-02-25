@@ -7,7 +7,7 @@
 // OpenAI API key is stored in localStorage (entered by user on first run)
 // Never hardcode API keys in source code
 let OPENAI_API_KEY = localStorage.getItem("cb_oai_key") || "";
-const OPENAI_MODEL   = "gpt-4.1";
+const OPENAI_MODEL   = "gpt-4o-mini";
 const FHIR_BASE      = "https://fhirassist.rsystems.com:481";
 const LOGIN_URL      = `${FHIR_BASE}/auth/login`;
 
