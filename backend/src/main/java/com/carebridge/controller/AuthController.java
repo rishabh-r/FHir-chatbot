@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -34,9 +33,11 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         try {
             String body = objectMapper.writeValueAsString(credentials);
+            // Use fully qualified okhttp3.RequestBody to avoid clash with Spring @RequestBody
+            okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(body, JSON_TYPE);
             Request req = new Request.Builder()
                     .url(FHIR_LOGIN_URL)
-                    .post(RequestBody.create(body, JSON_TYPE))
+                    .post(reqBody)
                     .build();
 
             try (Response resp = httpClient.newCall(req).execute()) {
