@@ -3,7 +3,9 @@
  * Handles all communication with the Spring Boot backend.
  */
 
-const API_BASE = '/api'
+// In production: set VITE_API_BASE=https://your-backend-server.com in Vercel env vars
+// In development: leave unset — Vite proxies /api → localhost:8080 automatically
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '') + '/api'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
