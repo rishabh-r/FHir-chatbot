@@ -24,90 +24,104 @@ export default function LoginScreen({ onLogin }) {
   }
 
   return (
-    <div className="login-page">
-      {/* ── Navbar ── */}
-      <nav className="login-nav">
-        <img src="/images/LogoRsi.png" alt="R Systems" className="login-nav-logo" />
-        <span className="login-nav-pill">For Care Coordinators &amp; Providers</span>
-      </nav>
+    <div className="login-screen">
+      {/* ── Topbar ── */}
+      <div className="login-topbar">
+        <img src="/images/LogoRsi.png" alt="R Systems" className="rsi-logo" />
+        <span className="login-topbar-badge">For Care Coordinators &amp; Providers</span>
+      </div>
 
-      {/* ── Content ── */}
-      <div className="login-content">
+      {/* ── Two-column body ── */}
+      <div className="login-body">
         {/* Left – Form */}
-        <div className="login-form-side">
-          <h1 className="login-heading">
-            Instant <span className="teal">Patient Insights</span><br />for Care Teams
-          </h1>
-          <p className="login-desc">
-            Access patient records, lab results, medications, encounters,
-            and clinical insights — all in one secure conversation.
-          </p>
+        <div className="login-left">
+          <div className="login-content">
+            <h1 className="login-heading">
+              Instant <span className="teal">Patient Insights</span><br />for Care Teams
+            </h1>
+            <p className="login-desc">
+              Give care coordination team instant, secure access to a complete patient view,
+              labs, medications, patient history, and care gaps, <strong>Powered by AI</strong> and{' '}
+              <strong>fully integrated with your existing EHR</strong>, to act faster, reduce risk,
+              and keep patients on track.
+            </p>
 
-          {error && (
-            <div className="login-error">
-              <span>⚠</span> {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="field-group">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@hospital.org"
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="field-group">
-              <label htmlFor="password">Password</label>
-              <div className="pw-wrapper">
-                <input
-                  id="password"
-                  type={showPw ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="toggle-pw"
-                  onClick={() => setShowPw(v => !v)}
-                  aria-label="Toggle password visibility"
-                >
-                  {showPw ? '🙈' : '👁'}
-                </button>
+            {error && (
+              <div className="error-banner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
               </div>
-            </div>
+            )}
 
-            <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? (
-                <><span className="spinner" /> Signing in...</>
-              ) : (
-                <><img src="/images/ChatBigIcon.png" className="btn-icon" alt="" /> Launch Provider Assistant</>
-              )}
-            </button>
-            <p className="login-secure-text">Secure access for healthcare professionals</p>
-          </form>
+            <form onSubmit={handleSubmit} autoComplete="off">
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  autoComplete="username"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="password">Password</label>
+                <div className="pw-wrap">
+                  <input
+                    id="password"
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="pw-toggle"
+                    onClick={() => setShowPw(v => !v)}
+                    aria-label="Toggle password visibility"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="17" height="17">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="launch-btn" disabled={loading}>
+                {loading ? (
+                  <span className="btn-spinner" />
+                ) : (
+                  <img src="/images/ChatBigIcon.png" alt="" className="btn-icon" />
+                )}
+                <span>{loading ? 'Signing in...' : 'Launch Provider Assistant'}</span>
+              </button>
+            </form>
+
+            <p className="login-footer">Secure access for healthcare professionals</p>
+          </div>
         </div>
 
-        {/* Right – Chatbot image */}
-        <div className="login-image-side">
-          <img src="/images/ChatBot.png" alt="CareBridge" className="login-hero-img" />
+        {/* Right – Floating icon */}
+        <div className="login-right">
+          <img src="/images/ChatBigIcon.png" alt="CareBridge" className="hero-icon" />
         </div>
       </div>
 
-      {/* ── Loading overlay ── */}
+      {/* ── Signing-in overlay ── */}
       {loading && (
         <div className="signin-overlay">
-          <div className="signin-loading-card">
-            <div className="signin-spinner" />
+          <div className="signin-box">
+            <div className="spinner-dark" />
             <p>Signing you in...</p>
           </div>
         </div>

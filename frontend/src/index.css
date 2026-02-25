@@ -1,16 +1,35 @@
-/* ── Global Reset & Base ──────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ── Global Reset & Variables ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --teal:       #00b5cc;
+  --teal-dark:  #0099af;
+  --teal-glow:  rgba(0, 181, 204, 0.2);
+  --blue:       #1a6ef5;
+  --navy:       #0a1628;
+  --navy-light: #1a2d4e;
+  --white:      #ffffff;
+  --bg:         #f4f7fc;
+  --border:     #e2e8f0;
+  --text-dark:  #0d1b2e;
+  --text-mid:   #4a5568;
+  --text-light: #9aa3b2;
+  --green:      #22c55e;
+  --shadow-sm:  0 1px 4px rgba(0,0,0,.07);
+  --shadow-md:  0 4px 20px rgba(0,0,0,.10);
+  --shadow-lg:  0 12px 48px rgba(0,0,0,.18);
+  --font:       'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 html, body, #root {
   height: 100%;
-  font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f7f8fc;
-  color: #1a202c;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
 }
+
+.teal { color: var(--teal); }
 
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; border: none; background: none; font-family: inherit; }

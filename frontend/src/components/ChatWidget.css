@@ -3,7 +3,7 @@
   position: fixed;
   bottom: 28px;
   right: 28px;
-  z-index: 1000;
+  z-index: 200;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -12,61 +12,57 @@
 
 /* ── Floating panel ───────────────────────────────────────────────────────── */
 .chat-window {
-  width: 400px;
-  height: 600px;
-  border-radius: 16px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22), 0 2px 12px rgba(0, 0, 0, 0.1);
+  width: 680px;
+  height: 520px;
+  background: var(--white);
+  border-radius: 22px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.22);
   overflow: hidden;
-  animation: slideUp 0.22s ease-out;
+  animation: slide-up .25s ease-out;
+  border: 1px solid var(--border);
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Launch / toggle button ───────────────────────────────────────────────── */
+/* ── Toggle button ────────────────────────────────────────────────────────── */
 .chat-toggle-btn {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #0bb5c8;
+  width: 66px;
+  height: 66px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
   border: none;
+  border-radius: 50%;
   cursor: pointer;
+  box-shadow: 0 6px 28px rgba(0, 181, 204, .55);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 18px rgba(11, 181, 200, 0.5);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform .2s, box-shadow .2s;
   flex-shrink: 0;
 }
 
 .chat-toggle-btn:hover {
-  transform: scale(1.07);
-  box-shadow: 0 6px 24px rgba(11, 181, 200, 0.6);
-}
-
-.chat-toggle-btn:active { transform: scale(0.96); }
-
-.chat-toggle-btn.open {
-  background: #374151;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+  transform: scale(1.08);
+  box-shadow: 0 8px 36px rgba(0, 181, 204, .65);
 }
 
 .chat-toggle-btn svg {
-  width: 22px;
-  height: 22px;
-  stroke: #fff;
+  width: 26px;
+  height: 26px;
+  color: white;
+  stroke: white;
 }
 
 .toggle-chat-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .chat-widget { bottom: 16px; right: 16px; }
-  .chat-window { width: calc(100vw - 32px); height: 70vh; }
+@media (max-width: 700px) {
+  .chat-widget { right: 16px; bottom: 16px; }
+  .chat-window { width: calc(100vw - 32px); }
 }

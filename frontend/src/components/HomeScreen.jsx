@@ -6,71 +6,75 @@ export default function HomeScreen({ userName, onLogout }) {
       {/* ── Navbar ── */}
       <nav className="navbar">
         <img src="/images/LogoRsi.png" alt="R Systems" className="nav-logo" />
-        <span className="nav-pill">For Care Coordinators &amp; Providers</span>
+        <span className="nav-tagline">For Care Coordinators &amp; Providers</span>
       </nav>
 
-      {/* ── Hero section ── */}
+      {/* ── Main ── */}
       <main className="home-main">
-        <div className="home-hero">
+        <section className="hero">
           <div className="hero-badge">AI-Powered FHIR Assistant</div>
-
-          <h1>
-            Streamline Your<br />
-            <span className="teal">Care Coordination</span>
+          <h1 className="hero-heading">
+            Streamline Your<br /><span className="teal">Care Coordination</span>
           </h1>
-
-          <p>
+          <p className="hero-sub">
             Access patient records, lab results, medications, and clinical history
             instantly — powered by AI and FHIR R4 integration.
           </p>
+        </section>
 
-          <div className="home-cards">
-            <div className="feature-card">
-              <div className="card-icon blue">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-                </svg>
-              </div>
-              <h3>Instant Record Retrieval</h3>
-              <p>Access complete patient histories and medical records in seconds.</p>
+        <section className="features">
+          <div className="feat-card">
+            <div className="feat-icon teal-bg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
             </div>
-
-            <div className="feature-card">
-              <div className="card-icon purple">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-                </svg>
-              </div>
-              <h3>HIPAA Compliant &amp; Secure</h3>
-              <p>Enterprise-grade security with encrypted data transmission.</p>
-            </div>
-
-            <div className="feature-card">
-              <div className="card-icon lavender">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z" />
-                </svg>
-              </div>
-              <h3>AI-Powered Insights</h3>
-              <p>Intelligent analysis of clinical data for faster decision making.</p>
-            </div>
-
-            <div className="feature-card">
-              <div className="card-icon green">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                </svg>
-              </div>
-              <h3>Comprehensive Reports</h3>
-              <p>Detailed clinical summaries from FHIR R4 data sources.</p>
-            </div>
+            <h3>Instant Record Retrieval</h3>
+            <p>Search patient records, diagnoses, and procedures in seconds using natural language.</p>
           </div>
-        </div>
+
+          <div className="feat-card">
+            <div className="feat-icon blue-bg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+            <h3>HIPAA Compliant &amp; Secure</h3>
+            <p>Bearer token authentication with secure FHIR R4 APIs. No patient data stored on servers.</p>
+          </div>
+
+          <div className="feat-card">
+            <div className="feat-icon purple-bg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </div>
+            <h3>AI-Powered Insights</h3>
+            <p>GPT-powered analysis of lab results and vitals with normal range flags and clinical context.</p>
+          </div>
+
+          <div className="feat-card">
+            <div className="feat-icon green-bg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <h3>Comprehensive Reports</h3>
+            <p>Generate discharge summaries, medication lists, and encounter histories on demand.</p>
+          </div>
+        </section>
       </main>
 
-      {/* ── Fixed Log Out button (bottom-left) ── */}
-      <button className="logout-fixed-btn" onClick={onLogout}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
+      {/* ── Fixed logout button ── */}
+      <button className="logout-btn-fixed" onClick={onLogout}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
           <polyline points="16 17 21 12 16 7" />
           <line x1="21" y1="12" x2="9" y2="12" />

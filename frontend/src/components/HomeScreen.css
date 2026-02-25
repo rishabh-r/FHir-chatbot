@@ -1,9 +1,8 @@
-/* ── Home Page ────────────────────────────────────────────────────────────── */
+/* ── Home Screen ──────────────────────────────────────────────────────────── */
+#home-screen,
 .home-page {
-  display: flex;
-  flex-direction: column;
+  background: linear-gradient(135deg, #e8f5fc 0%, #c5e8f5 100%);
   min-height: 100vh;
-  background: linear-gradient(135deg, #e0f5f8 0%, #cdeaf0 100%);
 }
 
 /* ── Navbar ───────────────────────────────────────────────────────────────── */
@@ -11,156 +10,140 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 48px;
+  padding: 16px 48px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   position: sticky;
   top: 0;
-  z-index: 50;
-}
-
-.nav-logo {
-  height: 32px;
-}
-
-.nav-pill {
-  padding: 8px 20px;
-  border: 1.5px solid #0bb5c8;
-  border-radius: 20px;
-  color: #0bb5c8;
-  font-size: 0.85rem;
-  font-weight: 500;
-  background: transparent;
-}
-
-/* ── Main ─────────────────────────────────────────────────────────────────── */
-.home-main {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 32px 100px;
-}
-
-.home-hero {
-  text-align: center;
-  max-width: 960px;
-  width: 100%;
-}
-
-/* ── Badge ────────────────────────────────────────────────────────────────── */
-.hero-badge {
-  display: inline-block;
-  padding: 6px 18px;
-  border: 1.5px solid #0bb5c8;
-  border-radius: 20px;
-  color: #0bb5c8;
-  font-size: 0.85rem;
-  font-weight: 500;
-  background: rgba(11, 181, 200, 0.07);
-  margin-bottom: 20px;
-}
-
-/* ── Heading ──────────────────────────────────────────────────────────────── */
-.home-hero h1 {
-  font-size: 2.8rem;
-  font-weight: 800;
-  color: #0a1628;
-  line-height: 1.2;
-  margin-bottom: 16px;
-}
-
-.home-hero h1 .teal {
-  color: #0bb5c8;
-}
-
-.home-hero > p {
-  font-size: 1rem;
-  color: #4a5568;
-  line-height: 1.7;
-  margin-bottom: 40px;
-  max-width: 560px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* ── Feature Cards ────────────────────────────────────────────────────────── */
-.home-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.feature-card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 24px 20px;
-  text-align: left;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
-
-.card-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
-}
-
-.card-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.card-icon.blue    { background: #dbeafe; color: #2563eb; }
-.card-icon.purple  { background: #ede9fe; color: #7c3aed; }
-.card-icon.lavender{ background: #f3e8ff; color: #9333ea; }
-.card-icon.green   { background: #d1fae5; color: #059669; }
-
-.feature-card h3 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #0a1628;
-  margin-bottom: 8px;
-}
-
-.feature-card p {
-  font-size: 0.85rem;
-  color: #718096;
-  line-height: 1.5;
-}
-
-/* ── Log Out button (fixed bottom-left) ───────────────────────────────────── */
-.logout-fixed-btn {
-  position: fixed;
-  bottom: 28px;
-  left: 28px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #0bb5c8;
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(11, 181, 200, 0.4);
-  transition: background 0.2s, transform 0.1s;
   z-index: 100;
 }
 
-.logout-fixed-btn:hover  { background: #09a3b4; }
-.logout-fixed-btn:active { transform: scale(0.97); }
+.nav-logo { height: 42px; object-fit: contain; }
 
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .home-cards { grid-template-columns: repeat(2, 1fr); }
-  .home-hero h1 { font-size: 2rem; }
-  .navbar { padding: 14px 20px; }
+.nav-tagline {
+  display: inline-block;
+  border: 1px solid rgba(0, 181, 204, 0.4);
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.4px;
 }
 
-@media (max-width: 480px) {
-  .home-cards { grid-template-columns: 1fr; }
+/* ── Home Main ────────────────────────────────────────────────────────────── */
+.home-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 72px 48px 100px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.hero { text-align: center; margin-bottom: 64px; }
+
+.hero-badge {
+  display: inline-block;
+  background: rgba(0, 181, 204, .1);
+  color: var(--teal-dark);
+  border: 1px solid rgba(0, 181, 204, .3);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 16px;
+  border-radius: 20px;
+  letter-spacing: 0.4px;
+  margin-bottom: 20px;
+}
+
+.hero-heading {
+  font-size: 52px;
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 1.15;
+  margin-bottom: 20px;
+  letter-spacing: -1.5px;
+}
+
+.hero-sub {
+  font-size: 17px;
+  color: var(--text-mid);
+  line-height: 1.7;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+/* ── Feature Cards ────────────────────────────────────────────────────────── */
+.features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.feat-card {
+  background: var(--white);
+  border-radius: 18px;
+  padding: 30px 26px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  transition: transform .25s, box-shadow .25s;
+}
+
+.feat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 36px rgba(0,0,0,.13); }
+
+.feat-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.feat-icon svg { width: 25px; height: 25px; }
+
+.teal-bg   { background: rgba(0,181,204,.12);  color: var(--teal-dark); }
+.blue-bg   { background: rgba(26,110,245,.12); color: var(--blue); }
+.purple-bg { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.green-bg  { background: rgba(34,197,94,.12);  color: #16a34a; }
+
+.feat-card h3 { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
+.feat-card p  { font-size: 13px; color: var(--text-mid); line-height: 1.65; }
+
+/* ── Fixed Logout button ──────────────────────────────────────────────────── */
+.logout-btn-fixed {
+  position: fixed;
+  bottom: 28px;
+  left: 28px;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 181, 204, 0.4);
+  transition: opacity .2s, box-shadow .2s, transform .1s;
+}
+
+.logout-btn-fixed:hover  { opacity: .9; box-shadow: 0 6px 28px rgba(0,181,204,.5); }
+.logout-btn-fixed:active { transform: translateY(1px); }
+.logout-btn-fixed svg    { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1000px) {
+  .features { grid-template-columns: repeat(2, 1fr); }
+  .hero-heading { font-size: 40px; }
+}
+
+@media (max-width: 700px) {
+  .features { grid-template-columns: 1fr; }
+  .home-main { padding: 40px 20px 100px; }
+  .navbar { padding: 14px 20px; }
+  .logout-btn-fixed { bottom: 16px; left: 16px; }
 }

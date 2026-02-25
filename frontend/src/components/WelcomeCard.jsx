@@ -15,7 +15,7 @@ const CHIPS = [
 export default function WelcomeCard({ userName, onChipClick }) {
   return (
     <div className="welcome-card">
-      <img src="/chatbot_image/chatbot.png" alt="CareBridge" className="wc-avatar" />
+      <img src="/chatbot_image/chatbot.png" alt="CareBridge" className="wc-avatar" style={{borderRadius:0,background:'none',padding:0}} />
       <h3>Hey {userName}, how can I assist you today?</h3>
       <p>
         Search patient records, retrieve lab results, conditions, medications,

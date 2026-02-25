@@ -4,19 +4,9 @@ import MessageBubble, { TypingIndicator } from './MessageBubble'
 import WelcomeCard             from './WelcomeCard'
 import './ChatPanel.css'
 
-/**
- * The main chat panel — message list + input box.
- * Manages:
- * - Conversation history sent to the backend
- * - Streaming text state
- * - UI messages shown to the user
- */
 export default function ChatPanel({ userName, fhirToken, onClose }) {
-  // UI messages: { role, content, time, id }
   const [uiMessages,   setUiMessages]   = useState([])
-  // Conversation history sent to backend: { role, content }
   const [history,      setHistory]      = useState([])
-  // Current streaming text (live)
   const [streamText,   setStreamText]   = useState('')
   const [isStreaming,  setIsStreaming]   = useState(false)
   const [inputText,    setInputText]    = useState('')
@@ -34,7 +24,6 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
   const formatTime = () =>
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-  // ── Send handler ────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (text) => {
     const trimmed = (text || inputText).trim()
     if (!trimmed || sendDisabled) return
@@ -42,15 +31,12 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
     setInputText('')
     setSendDisabled(true)
 
-    // Add user message to UI
     const userUiMsg = { id: Date.now(), role: 'user', content: trimmed, time: formatTime() }
     setUiMessages(prev => [...prev, userUiMsg])
 
-    // Add to history for backend
     const newHistory = [...history, { role: 'user', content: trimmed }]
     setHistory(newHistory)
 
-    // Show streaming bubble
     setIsStreaming(true)
     setStreamText('')
 
@@ -59,12 +45,10 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
     await streamChat(
       newHistory,
       fhirToken,
-      // onChunk
       (chunk) => {
         accumulated += chunk
         setStreamText(accumulated)
       },
-      // onDone
       () => {
         const botMsg = { id: Date.now() + 1, role: 'assistant', content: accumulated, time: formatTime() }
         setUiMessages(prev => [...prev, botMsg])
@@ -74,7 +58,6 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
         setSendDisabled(false)
         inputRef.current?.focus()
       },
-      // onError
       (errMsg) => {
         const errBotMsg = {
           id: Date.now() + 1,
@@ -109,7 +92,6 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
 
   const handleInputChange = (e) => {
     setInputText(e.target.value)
-    // Auto-resize textarea
     e.target.style.height = 'auto'
     e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'
   }
@@ -123,7 +105,7 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
         <div className="chat-header-left">
           <img src="/chatbot_image/chatbot.png" alt="CareBridge" className="chat-header-avatar" />
           <div>
-            <div className="chat-header-name">RSICareBridge</div>
+            <span className="chat-header-name">RSICareBridge</span>
             <div className="chat-header-status">
               <span className="online-dot" />
               Online
@@ -132,15 +114,22 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
         </div>
         <div className="chat-header-right">
           <button className="header-btn" onClick={handleClearChat} title="Clear chat">
-            🗑
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" /><path d="M14 11v6" />
+            </svg>
           </button>
-          <button className="header-btn close-btn" onClick={onClose} title="Close">
-            ✕
+          <button className="header-btn" onClick={onClose} title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
       </div>
 
-      {/* ── Message list ── */}
+      {/* ── Messages ── */}
       <div className="chat-messages">
         {showWelcome && (
           <WelcomeCard userName={userName} onChipClick={handleChipClick} />
@@ -155,48 +144,41 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
           />
         ))}
 
-        {/* Live streaming bubble */}
         {isStreaming && streamText && (
-          <MessageBubble
-            role="assistant"
-            content={streamText}
-            isStreaming
-          />
+          <MessageBubble role="assistant" content={streamText} isStreaming />
         )}
 
-        {/* Typing indicator (shown while waiting for first chunk) */}
         {isStreaming && !streamText && <TypingIndicator />}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Disclaimer ── */}
-      <div className="chat-disclaimer">
-        CareBridge retrieves FHIR R4 data. Never provides treatment recommendations.
-      </div>
-
-      {/* ── Input area ── */}
-      <div className="chat-input-area">
-        <textarea
-          ref={inputRef}
-          className="chat-input"
-          placeholder="Ask about patient records, labs..."
-          value={inputText}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          rows={1}
-          disabled={sendDisabled}
-        />
-        <button
-          className="send-btn"
-          onClick={() => handleSend()}
-          disabled={sendDisabled || !inputText.trim()}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
+      {/* ── Input bar ── */}
+      <div className="chat-input-bar">
+        <div className="input-container">
+          <textarea
+            ref={inputRef}
+            className="chat-input"
+            placeholder="Ask about patient records, labs..."
+            value={inputText}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            disabled={sendDisabled}
+          />
+          <button
+            className="send-btn"
+            onClick={() => handleSend()}
+            disabled={sendDisabled || !inputText.trim()}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </button>
+        </div>
+        <p className="input-hint">
+          CareBridge retrieves FHIR R4 data. Never provides treatment recommendations.
+        </p>
       </div>
     </div>
   )
