@@ -2,10 +2,6 @@ import { useState } from 'react'
 import { login }    from '../services/api'
 import './LoginScreen.css'
 
-/**
- * Login page — mirrors the original HTML login screen.
- * Calls the backend /api/auth/login endpoint (which proxies to FHIR).
- */
 export default function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -29,28 +25,23 @@ export default function LoginScreen({ onLogin }) {
 
   return (
     <div className="login-page">
-      {/* ── Left hero panel ── */}
-      <div className="login-hero">
-        <div className="hero-content">
-          <img src="/images/LogoRsi.png" alt="R Systems" className="hero-logo" />
-          <div className="hero-icon-wrap">
-            <img src="/images/ChatBigIcon.png" alt="" className="hero-icon" />
-          </div>
-          <h1 className="hero-title">CareBridge</h1>
-          <p className="hero-sub">Clinical AI Assistant – Powered by FHIR R4</p>
-          <p className="hero-desc">
-            Instant access to patient records, lab results, medications,
-            encounters, and clinical insights — all in one conversation.
-          </p>
-        </div>
-      </div>
+      {/* ── Navbar ── */}
+      <nav className="login-nav">
+        <img src="/images/LogoRsi.png" alt="R Systems" className="login-nav-logo" />
+        <span className="login-nav-pill">For Care Coordinators &amp; Providers</span>
+      </nav>
 
-      {/* ── Right login panel ── */}
-      <div className="login-panel">
-        <div className="login-card">
-          <img src="/chatbot_image/chatbot.png" alt="CareBridge" className="login-avatar" />
-          <h2 className="login-title">Provider Sign In</h2>
-          <p className="login-subtitle">Access your clinical workspace</p>
+      {/* ── Content ── */}
+      <div className="login-content">
+        {/* Left – Form */}
+        <div className="login-form-side">
+          <h1 className="login-heading">
+            Instant <span className="teal">Patient Insights</span><br />for Care Teams
+          </h1>
+          <p className="login-desc">
+            Access patient records, lab results, medications, encounters,
+            and clinical insights — all in one secure conversation.
+          </p>
 
           {error && (
             <div className="login-error">
@@ -60,7 +51,7 @@ export default function LoginScreen({ onLogin }) {
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="field-group">
-              <label htmlFor="email">Email address</label>
+              <label htmlFor="email">Email Address</label>
               <input
                 id="email"
                 type="email"
@@ -99,15 +90,28 @@ export default function LoginScreen({ onLogin }) {
               {loading ? (
                 <><span className="spinner" /> Signing in...</>
               ) : (
-                'Launch Provider Assistant'
+                <><img src="/images/ChatBigIcon.png" className="btn-icon" alt="" /> Launch Provider Assistant</>
               )}
             </button>
+            <p className="login-secure-text">Secure access for healthcare professionals</p>
           </form>
+        </div>
+
+        {/* Right – Chatbot image */}
+        <div className="login-image-side">
+          <img src="/images/ChatBot.png" alt="CareBridge" className="login-hero-img" />
         </div>
       </div>
 
-      {/* Overlay during login */}
-      {loading && <div className="signin-overlay" />}
+      {/* ── Loading overlay ── */}
+      {loading && (
+        <div className="signin-overlay">
+          <div className="signin-loading-card">
+            <div className="signin-spinner" />
+            <p>Signing you in...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

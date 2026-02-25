@@ -37,7 +37,7 @@ export default function ChatWidget({ userName, fhirToken }) {
           </svg>
         ) : (
           /* Chat icon */
-          <img src="/images/ChatBigIcon.png" alt="Chat" className="toggle-chat-icon" />
+          <img src="/chatbot_image/chatbot.png" alt="Chat" className="toggle-chat-icon" />
         )}
       </button>
     </div>

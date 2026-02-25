@@ -1,4 +1,4 @@
-/* ── Widget container (fixed bottom-right) ──────────────────────────────── */
+/* ── Widget container (fixed bottom-right) ────────────────────────────────── */
 .chat-widget {
   position: fixed;
   bottom: 28px;
@@ -10,12 +10,12 @@
   gap: 12px;
 }
 
-/* ── Floating panel ─────────────────────────────────────────────────────── */
+/* ── Floating panel ───────────────────────────────────────────────────────── */
 .chat-window {
-  width: 380px;
-  height: 580px;
+  width: 400px;
+  height: 600px;
   border-radius: 16px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 2px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22), 0 2px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   animation: slideUp 0.22s ease-out;
 }
@@ -25,32 +25,32 @@
   to   { opacity: 1; transform: translateY(0)   scale(1); }
 }
 
-/* ── Launch / toggle button ─────────────────────────────────────────────── */
+/* ── Launch / toggle button ───────────────────────────────────────────────── */
 .chat-toggle-btn {
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  background: #0bb5c8;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 18px rgba(37,99,235,0.45);
+  box-shadow: 0 4px 18px rgba(11, 181, 200, 0.5);
   transition: transform 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
 }
 
 .chat-toggle-btn:hover {
   transform: scale(1.07);
-  box-shadow: 0 6px 24px rgba(37,99,235,0.55);
+  box-shadow: 0 6px 24px rgba(11, 181, 200, 0.6);
 }
 
 .chat-toggle-btn:active { transform: scale(0.96); }
 
 .chat-toggle-btn.open {
-  background: linear-gradient(135deg, #374151, #1f2937);
-  box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+  background: #374151;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
 }
 
 .chat-toggle-btn svg {
@@ -60,12 +60,12 @@
 }
 
 .toggle-chat-icon {
-  width: 32px;
-  height: 32px;
-  filter: brightness(0) invert(1);
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────────────── */
+/* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .chat-widget { bottom: 16px; right: 16px; }
   .chat-window { width: calc(100vw - 32px); height: 70vh; }

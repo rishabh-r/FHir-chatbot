@@ -123,8 +123,11 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
         <div className="chat-header-left">
           <img src="/chatbot_image/chatbot.png" alt="CareBridge" className="chat-header-avatar" />
           <div>
-            <div className="chat-header-name">CareBridge</div>
-            <div className="chat-header-sub">Clinical AI Assistant</div>
+            <div className="chat-header-name">RSICareBridge</div>
+            <div className="chat-header-status">
+              <span className="online-dot" />
+              Online
+            </div>
           </div>
         </div>
         <div className="chat-header-right">
@@ -167,12 +170,17 @@ export default function ChatPanel({ userName, fhirToken, onClose }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* ── Disclaimer ── */}
+      <div className="chat-disclaimer">
+        CareBridge retrieves FHIR R4 data. Never provides treatment recommendations.
+      </div>
+
       {/* ── Input area ── */}
       <div className="chat-input-area">
         <textarea
           ref={inputRef}
           className="chat-input"
-          placeholder="Ask about a patient, lab results, medications..."
+          placeholder="Ask about patient records, labs..."
           value={inputText}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
