@@ -200,10 +200,35 @@ LOINC CODES AND UNITS:
 53. Diastolic Blood Pressure: 8462-4, mm[Hg]
 54. Systolic Blood Pressure: 8480-6, mm[Hg]
 55. Heart rate: 8867-4, mg/dL
+56. BMI: 39156-5, kg/m2
 `;
 
+// ── Dynamic Knowledge Base Selector ──────────────────
+// Returns only the relevant knowledge base(s) based on the user's query
+// to reduce prompt size and speed up gpt-5 responses
+function getRelevantKnowledge(message) {
+  const msg = message.toLowerCase();
+
+  const isObs  = /\b(observation|lab|vital|hemoglobin|glucose|sodium|potassium|creatinine|blood pressure|heart rate|bmi|result|test|level|count|troponin|lactate|bilirubin|calcium|chloride|cholesterol|magnesium|phosphate|ammonia|amylase|lipase|gfr|hba1c|psa|cea|fev|oxygen|saturation|bicarbonate|anion|protein|alkaline|alt|ast|urea)\b/.test(msg);
+  const isMed  = /\b(medication|drug|prescription|medicine|prescribed|tablet|pill|dose|formulary|active med)\b/.test(msg);
+  const isCond = /\b(condition|diagnosis|diagnos|disease|disorder|icd|illness)\b/.test(msg);
+  const isProc = /\b(procedure|surgery|operation|cpt|surgical)\b/.test(msg);
+
+  const total = [isObs, isMed, isCond, isProc].filter(Boolean).length;
+
+  // Multiple categories or none detected → include all knowledge bases
+  if (total !== 1) return `${LOINC_CODES}\n${CONDITION_CODES}\n${DRUG_CODES}\n${PROCEDURE_CODES}\n${OBSERVATION_RANGES}`;
+
+  if (isObs)  return `${LOINC_CODES}\n${OBSERVATION_RANGES}`;
+  if (isMed)  return DRUG_CODES;
+  if (isCond) return CONDITION_CODES;
+  if (isProc) return PROCEDURE_CODES;
+
+  return `${LOINC_CODES}\n${CONDITION_CODES}\n${DRUG_CODES}\n${PROCEDURE_CODES}\n${OBSERVATION_RANGES}`;
+}
+
 // ── System Prompt ────────────────────────────────────
-function buildSystemPrompt() {
+function buildSystemPrompt(knowledge) {
   return `## ROLE AND OBJECTIVE
 You are CareBridge, an intelligent clinical information assistant that retrieves and analyzes patient records from FHIR R4 for healthcare staff. Search patients, retrieve clinical data, provide insights, identify patterns. Never provide treatment recommendations.
 
@@ -269,6 +294,7 @@ Clinical, professional, efficient, analytical, evidence-based, patient with clar
 - 10+: "This patient has [X] [items]. List all or looking for something specific?"
 - For Conditions by name: Look up ICD-9 code from knowledge base → pass as CODE (no SUBJECT needed for cross-patient search)
 - For Medications by drug name: Look up Drug Code from knowledge base → pass as CODE (no SUBJECT needed)
+- If user asks for "active medications": fetch all medications for the patient, then filter and display ONLY those whose status is "active" — exclude stopped, cancelled, completed, or any other status
 - For Procedures by category: Look up mincode/maxcode from knowledge base → pass as CODE
 
 **Observations:**
@@ -279,7 +305,7 @@ Clinical, professional, efficient, analytical, evidence-based, patient with clar
 - For filtered queries (e.g. hemoglobin > 10): use value_quantity format: "gt10|mEq/L"
   * gt = greater than, lt = less than, eq = equal to
 - After returning an observation value: look up parameter in observation ranges knowledge base → provide Result (Low/Normal/High) and Recommendations
-- If user asks for "recent observations", "latest observations", "her observations", "his observations", or any general observation request WITHOUT specifying a type: DO NOT ask the user — automatically fetch these key observations in sequence and present a summary: Hemoglobin (718-7), Glucose (2345-7), Sodium (2951-2), Potassium (2823-3), Creatinine (2160-0), Systolic Blood Pressure (8480-6), Diastolic Blood Pressure (8462-4), Heart Rate (8867-4). Call each one individually with the patient subject and present all results together as a clinical summary.
+- If user asks for "recent observations", "latest observations", "her observations", "his observations", or any general observation request WITHOUT specifying a type: DO NOT ask the user — automatically fetch these key observations in a SINGLE response with all 8 tool_calls at once (not one by one): Hemoglobin (718-7), Glucose (2345-7), Sodium (2951-2), Potassium (2823-3), Creatinine (2160-0), Systolic Blood Pressure (8480-6), Diastolic Blood Pressure (8462-4), Heart Rate (8867-4). Emit all 8 search_patient_observations calls simultaneously in one response, then present all results together as a clinical summary.
 
 **search_patient_encounter:**
 - For date range: pass first DATE as "gt2000-01-13", second DATE as "lt2024-09-13"
@@ -296,15 +322,7 @@ Example: "Yes, based on: Diagnosis (Type 2 Diabetes ICD-10: E11.9), Medications 
 ## DISCHARGE SUMMARY
 If requested, fetch: Patient demographics, Encounter (admission/discharge), Condition (diagnoses), Procedure, Observation (labs), MedicationRequest (discharge meds). Synthesize into brief narrative format.
 
-${LOINC_CODES}
-
-${CONDITION_CODES}
-
-${DRUG_CODES}
-
-${PROCEDURE_CODES}
-
-${OBSERVATION_RANGES}
+${knowledge}
 
 ## CRITICAL REMINDERS
 - Never fabricate data — only use data from API responses
@@ -521,10 +539,19 @@ async function executeTool(name, args) {
   }
 }
 
-// ── OpenAI Chat Completion (with auto-retry on rate limit) ──
+// ── OpenAI Streaming Chat Completion (with auto-retry on rate limit) ──
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function sendToOpenAI(messages, retryCount = 0) {
+// Builds system prompt dynamically — injects only relevant knowledge base per query
+// This reduces token count and speeds up gpt-5 significantly
+function getSystemPrompt(userMessage) {
+  const knowledge = getRelevantKnowledge(userMessage);
+  return buildSystemPrompt(knowledge);
+}
+
+// Streams the OpenAI response. Calls onTextChunk(chunk) for each text delta.
+// Returns { content, tool_calls, finish_reason }.
+async function sendToOpenAI(messages, onTextChunk = null, retryCount = 0) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -535,94 +562,232 @@ async function sendToOpenAI(messages, retryCount = 0) {
       model: OPENAI_MODEL,
       messages,
       tools: TOOLS,
-      tool_choice: "auto"
+      tool_choice: "auto",
+      stream: true
     })
   });
 
   if (res.status === 429 && retryCount < 3) {
-    const err = await res.json();
-    const msg = err.error?.message || "";
-    // Parse "try again in 9.45s" from OpenAI error message
-    const match = msg.match(/try again in (\d+\.?\d*)s/i);
-    const waitMs = match ? Math.ceil(parseFloat(match[1]) * 1000) + 500 : 12000;
+    const errText = await res.text();
+    let waitMs = 12000;
+    try {
+      const errJson = JSON.parse(errText);
+      const msg = errJson.error?.message || "";
+      const match = msg.match(/try again in (\d+\.?\d*)s/i);
+      if (match) waitMs = Math.ceil(parseFloat(match[1]) * 1000) + 500;
+    } catch (e) {}
     const waitSec = Math.ceil(waitMs / 1000);
-    // Update typing indicator to show waiting status
     const typingBubble = document.querySelector(".typing-bubble");
     if (typingBubble) {
       typingBubble.innerHTML = `<span style="font-size:11px;color:#4a5568">Rate limit reached. Retrying in ${waitSec}s...</span>`;
     }
     await sleep(waitMs);
-    // Restore typing dots
     if (typingBubble) {
       typingBubble.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
     }
-    return sendToOpenAI(messages, retryCount + 1);
+    return sendToOpenAI(messages, onTextChunk, retryCount + 1);
   }
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || "OpenAI API error");
+    const errJson = await res.json();
+    throw new Error(errJson.error?.message || "OpenAI API error");
   }
-  return res.json();
+
+  // Parse SSE stream
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullContent   = "";
+  const toolCallsMap = {};
+  let finishReason  = null;
+  let buffer        = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop(); // keep incomplete line
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (data === "[DONE]") { finishReason = finishReason || "stop"; continue; }
+      if (!data) continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const choice = parsed.choices?.[0];
+        if (!choice) continue;
+
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+
+        const delta = choice.delta;
+        if (delta?.content) {
+          fullContent += delta.content;
+          if (onTextChunk) onTextChunk(delta.content);
+        }
+
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index;
+            if (!toolCallsMap[idx]) {
+              toolCallsMap[idx] = { id: "", type: "function", function: { name: "", arguments: "" } };
+            }
+            if (tc.id)                 toolCallsMap[idx].id                   += tc.id;
+            if (tc.function?.name)     toolCallsMap[idx].function.name        += tc.function.name;
+            if (tc.function?.arguments) toolCallsMap[idx].function.arguments  += tc.function.arguments;
+          }
+        }
+      } catch (e) { /* ignore malformed chunks */ }
+    }
+  }
+
+  const toolCallsList = Object.values(toolCallsMap);
+  return {
+    content:       fullContent || null,
+    tool_calls:    toolCallsList.length ? toolCallsList : null,
+    finish_reason: finishReason || (toolCallsList.length ? "tool_calls" : "stop")
+  };
 }
 
-// ── Agentic Loop: handles multiple tool calls ────────
+// ── Streaming bubble helpers ─────────────────────────
+function createStreamingBubble() {
+  const container = document.getElementById("messages");
+  const welcome = container.querySelector(".welcome-card");
+  if (welcome) welcome.remove();
+
+  const row = document.createElement("div");
+  row.className = "msg-row bot";
+
+  const img = document.createElement("img");
+  img.src = "chatbot_image/chatbot.png";
+  img.alt = "CareBridge";
+  img.className = "msg-avatar";
+  const avatarEl = document.createElement("div");
+  avatarEl.appendChild(img);
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble";
+
+  const textEl = document.createElement("span");
+  bubble.appendChild(textEl);
+
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "flex";
+  wrapper.style.flexDirection = "column";
+  wrapper.style.maxWidth = "80%";
+  wrapper.appendChild(bubble);
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "msg-time";
+  timeEl.textContent = formatTime();
+  wrapper.appendChild(timeEl);
+
+  row.appendChild(avatarEl);
+  row.appendChild(wrapper);
+  container.appendChild(row);
+  scrollToBottom();
+  return bubble;
+}
+
+function updateStreamingBubble(bubble, text) {
+  bubble.querySelector("span").textContent = text;
+  scrollToBottom();
+}
+
+function finalizeStreamingBubble(bubble, fullText) {
+  bubble.innerHTML = simpleMarkdown(fullText || "");
+  scrollToBottom();
+}
+
+// ── Agentic Loop: handles multiple tool calls with streaming ──
 async function agentLoop(userMessage) {
   conversationHistory.push({ role: "user", content: userMessage });
 
+  // Limit history to last 20 entries to reduce tokens sent to gpt-5
+  // Trim from the front until we start at a clean user message
+  let recentHistory = conversationHistory.slice(-20);
+  while (recentHistory.length > 0 && recentHistory[0].role !== "user") {
+    recentHistory = recentHistory.slice(1);
+  }
+
   const messages = [
-    { role: "system", content: buildSystemPrompt() },
-    ...conversationHistory
+    { role: "system", content: getSystemPrompt(userMessage) },
+    ...recentHistory
   ];
 
   showTyping();
+  let streamBubble = null;
 
   try {
-    let response = await sendToOpenAI(messages);
-    let choice   = response.choices[0];
+    while (true) {
+      let chunkAccum = "";
 
-    // Loop to handle multi-step tool calls
-    while (choice.finish_reason === "tool_calls") {
-      const assistantMsg = choice.message;
-      messages.push(assistantMsg);
-      conversationHistory.push(assistantMsg);
+      const result = await sendToOpenAI(messages, (chunk) => {
+        // First chunk — hide typing indicator and create live bubble
+        if (!streamBubble) {
+          hideTyping();
+          streamBubble = createStreamingBubble();
+        }
+        chunkAccum += chunk;
+        updateStreamingBubble(streamBubble, chunkAccum);
+      });
 
-      // Execute each tool call in parallel
-      const toolResults = await Promise.all(
-        assistantMsg.tool_calls.map(async (tc) => {
-          const args   = JSON.parse(tc.function.arguments || "{}");
-          const result = await executeTool(tc.function.name, args);
-          return {
-            role:         "tool",
-            tool_call_id: tc.id,
-            content:      JSON.stringify(result)
-          };
-        })
-      );
+      const isToolCall = result.finish_reason === "tool_calls" ||
+                         (result.tool_calls && result.tool_calls.length > 0);
 
-      // Handle end_chat specially
-      const endCall = assistantMsg.tool_calls.find(tc => tc.function.name === "end_chat");
-      if (endCall) {
-        const args = JSON.parse(endCall.function.arguments || "{}");
-        hideTyping();
-        appendMessage("bot", args.farewell_message || "Thank you for using CareBridge. Have a great day!");
-        return;
+      if (isToolCall) {
+        streamBubble = null; // reset for next iteration
+
+        const assistantMsg = {
+          role:       "assistant",
+          content:    result.content || null,
+          tool_calls: result.tool_calls
+        };
+        messages.push(assistantMsg);
+        conversationHistory.push(assistantMsg);
+
+        // Handle end_chat
+        const endCall = result.tool_calls.find(tc => tc.function.name === "end_chat");
+        if (endCall) {
+          const args = JSON.parse(endCall.function.arguments || "{}");
+          hideTyping();
+          appendMessage("bot", args.farewell_message || "Thank you for using CareBridge. Have a great day!");
+          return;
+        }
+
+        // Execute all tool calls in parallel
+        const toolResults = await Promise.all(
+          result.tool_calls.map(async (tc) => {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const res  = await executeTool(tc.function.name, args);
+            return {
+              role:         "tool",
+              tool_call_id: tc.id,
+              content:      JSON.stringify(res)
+            };
+          })
+        );
+
+        messages.push(...toolResults);
+        conversationHistory.push(...toolResults);
+        showTyping(); // show typing again while AI processes tool results
+
+      } else {
+        // Final text response
+        const finalText = result.content || "";
+        conversationHistory.push({ role: "assistant", content: finalText });
+
+        if (streamBubble) {
+          finalizeStreamingBubble(streamBubble, finalText);
+        } else {
+          hideTyping();
+          appendMessage("bot", finalText);
+        }
+        break;
       }
-
-      // Add tool results back to messages and re-query
-      messages.push(...toolResults);
-      conversationHistory.push(...toolResults);
-
-      response = await sendToOpenAI(messages);
-      choice   = response.choices[0];
     }
-
-    // Final text response
-    hideTyping();
-    const finalText = choice.message.content || "";
-    conversationHistory.push({ role: "assistant", content: finalText });
-    appendMessage("bot", finalText);
-
   } catch (err) {
     hideTyping();
     appendMessage("bot", `Sorry, I encountered an error: ${err.message}. Please try again.`);
@@ -668,35 +833,9 @@ function formatTime() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Very light markdown-to-HTML (bold, numbered/bullet lists, code)
+// Markdown renderer using marked.js (handles numbered lists, bullets, bold, code, etc.)
 function simpleMarkdown(text) {
-  let html = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // Bold
-  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  // Numbered list
-  html = html.replace(/((?:^\d+\. .+\n?)+)/gm, (match) => {
-    const items = match.trim().split("\n").map(l => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("");
-    return `<ol>${items}</ol>`;
-  });
-  // Bullet list
-  html = html.replace(/((?:^[-•*] .+\n?)+)/gm, (match) => {
-    const items = match.trim().split("\n").map(l => `<li>${l.replace(/^[-•*] /, "")}</li>`).join("");
-    return `<ul>${items}</ul>`;
-  });
-
-  // Paragraphs (double newlines)
-  html = html.replace(/\n{2,}/g, "</p><p>");
-  // Line breaks
-  html = html.replace(/\n/g, "<br>");
-
-  return `<p>${html}</p>`;
+  return marked.parse(text || "");
 }
 
 function appendMessage(role, text) {
@@ -768,11 +907,11 @@ function showWelcomeCard(name) {
       <h3>Hey ${name}, how can I assist you today?</h3>
       <p>Search patient records, retrieve lab results, conditions, medications, encounters, and procedures.</p>
       <div class="welcome-chips">
-        <span class="chip" data-q="Search for patient John Smith">Search patient</span>
-        <span class="chip" data-q="Show conditions for patient 10011">View conditions</span>
-        <span class="chip" data-q="What is the hemoglobin count for patient 10011?">Lab results</span>
-        <span class="chip" data-q="List medications for patient 10011">Medications</span>
-        <span class="chip" data-q="Show encounters for patient 10011">Encounters</span>
+        <span class="chip" data-q="Search for patient David Stan">Search patient</span>
+        <span class="chip" data-q="Show conditions for patient 10035">View conditions</span>
+        <span class="chip" data-q="What is the hemoglobin count for patient 10035?">Lab results</span>
+        <span class="chip" data-q="List medications for patient 10035">Medications</span>
+        <span class="chip" data-q="Show encounters for patient 10035">Encounters</span>
       </div>
     </div>
   `;
