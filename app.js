@@ -7,7 +7,7 @@
 // OpenAI API key is stored in localStorage (entered by user on first run)
 // Never hardcode API keys in source code
 let OPENAI_API_KEY = localStorage.getItem("cb_oai_key") || "";
-const OPENAI_MODEL   = "gpt-5";
+const OPENAI_MODEL   = "gpt-4.1";
 const FHIR_BASE      = "https://fhirassist.rsystems.com:481";
 const LOGIN_URL      = `${FHIR_BASE}/auth/login`;
 
@@ -203,32 +203,8 @@ LOINC CODES AND UNITS:
 56. BMI: 39156-5, kg/m2
 `;
 
-// ── Dynamic Knowledge Base Selector ──────────────────
-// Returns only the relevant knowledge base(s) based on the user's query
-// to reduce prompt size and speed up gpt-5 responses
-function getRelevantKnowledge(message) {
-  const msg = message.toLowerCase();
-
-  const isObs  = /\b(observation|lab|vital|hemoglobin|glucose|sodium|potassium|creatinine|blood pressure|heart rate|bmi|result|test|level|count|troponin|lactate|bilirubin|calcium|chloride|cholesterol|magnesium|phosphate|ammonia|amylase|lipase|gfr|hba1c|psa|cea|fev|oxygen|saturation|bicarbonate|anion|protein|alkaline|alt|ast|urea)\b/.test(msg);
-  const isMed  = /\b(medication|drug|prescription|medicine|prescribed|tablet|pill|dose|formulary|active med)\b/.test(msg);
-  const isCond = /\b(condition|diagnosis|diagnos|disease|disorder|icd|illness)\b/.test(msg);
-  const isProc = /\b(procedure|surgery|operation|cpt|surgical)\b/.test(msg);
-
-  const total = [isObs, isMed, isCond, isProc].filter(Boolean).length;
-
-  // Multiple categories or none detected → include all knowledge bases
-  if (total !== 1) return `${LOINC_CODES}\n${CONDITION_CODES}\n${DRUG_CODES}\n${PROCEDURE_CODES}\n${OBSERVATION_RANGES}`;
-
-  if (isObs)  return `${LOINC_CODES}\n${OBSERVATION_RANGES}`;
-  if (isMed)  return DRUG_CODES;
-  if (isCond) return CONDITION_CODES;
-  if (isProc) return PROCEDURE_CODES;
-
-  return `${LOINC_CODES}\n${CONDITION_CODES}\n${DRUG_CODES}\n${PROCEDURE_CODES}\n${OBSERVATION_RANGES}`;
-}
-
 // ── System Prompt ────────────────────────────────────
-function buildSystemPrompt(knowledge) {
+function buildSystemPrompt() {
   return `## ROLE AND OBJECTIVE
 You are CareBridge, an intelligent clinical information assistant that retrieves and analyzes patient records from FHIR R4 for healthcare staff. Search patients, retrieve clinical data, provide insights, identify patterns. Never provide treatment recommendations.
 
@@ -322,7 +298,15 @@ Example: "Yes, based on: Diagnosis (Type 2 Diabetes ICD-10: E11.9), Medications 
 ## DISCHARGE SUMMARY
 If requested, fetch: Patient demographics, Encounter (admission/discharge), Condition (diagnoses), Procedure, Observation (labs), MedicationRequest (discharge meds). Synthesize into brief narrative format.
 
-${knowledge}
+${LOINC_CODES}
+
+${CONDITION_CODES}
+
+${DRUG_CODES}
+
+${PROCEDURE_CODES}
+
+${OBSERVATION_RANGES}
 
 ## CRITICAL REMINDERS
 - Never fabricate data — only use data from API responses
@@ -542,11 +526,11 @@ async function executeTool(name, args) {
 // ── OpenAI Streaming Chat Completion (with auto-retry on rate limit) ──
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Builds system prompt dynamically — injects only relevant knowledge base per query
-// This reduces token count and speeds up gpt-5 significantly
-function getSystemPrompt(userMessage) {
-  const knowledge = getRelevantKnowledge(userMessage);
-  return buildSystemPrompt(knowledge);
+// Cached system prompt — built once per session
+let _systemPromptCache = null;
+function getSystemPrompt() {
+  if (!_systemPromptCache) _systemPromptCache = buildSystemPrompt();
+  return _systemPromptCache;
 }
 
 // Streams the OpenAI response. Calls onTextChunk(chunk) for each text delta.
@@ -705,16 +689,9 @@ function finalizeStreamingBubble(bubble, fullText) {
 async function agentLoop(userMessage) {
   conversationHistory.push({ role: "user", content: userMessage });
 
-  // Limit history to last 20 entries to reduce tokens sent to gpt-5
-  // Trim from the front until we start at a clean user message
-  let recentHistory = conversationHistory.slice(-20);
-  while (recentHistory.length > 0 && recentHistory[0].role !== "user") {
-    recentHistory = recentHistory.slice(1);
-  }
-
   const messages = [
-    { role: "system", content: getSystemPrompt(userMessage) },
-    ...recentHistory
+    { role: "system", content: getSystemPrompt() },
+    ...conversationHistory
   ];
 
   showTyping();
