@@ -7,24 +7,51 @@ import '../dashboard.css'
 function parsePatientResource(entry, patientId) {
   const resource = entry?.[0]?.resource
   if (!resource) return null
-  const given = resource.name?.[0]?.given?.join(' ') || ''
-  const family = resource.name?.[0]?.family || ''
-  const name = [given, family].filter(Boolean).join(' ') || 'Unknown'
-  const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3)
+  console.log('[Dashboard] Raw FHIR Patient resource:', JSON.stringify(resource, null, 2))
+
+  let name = 'Unknown'
+  if (resource.name?.length) {
+    const n = resource.name[0]
+    if (n.text) {
+      name = n.text
+    } else {
+      const given = n.given?.join(' ') || ''
+      const family = n.family || ''
+      name = [given, family].filter(Boolean).join(' ') || name
+    }
+  }
+  const initials = name !== 'Unknown'
+    ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3)
+    : 'U'
+
+  const gender = resource.gender
+    ? resource.gender.charAt(0).toUpperCase() + resource.gender.slice(1)
+    : '—'
+
+  let phone = '—', email = '—'
+  const telecoms = resource.telecom || []
+  for (const t of telecoms) {
+    if (t.system === 'phone' && phone === '—') phone = t.value
+    if (t.system === 'email' && email === '—') email = t.value
+  }
+  if (phone === '—' && telecoms.length > 0) phone = telecoms[0]?.value || '—'
+
+  let age = '—', dob = '—'
   const birthDate = resource.birthDate || ''
-  const gender = resource.gender ? resource.gender.charAt(0).toUpperCase() + resource.gender.slice(1) : '—'
-  const phone = resource.telecom?.find(t => t.system === 'phone')?.value || '—'
-  const email = resource.telecom?.find(t => t.system === 'email')?.value || '—'
-  let age = '—'
   if (birthDate) {
-    const diff = Date.now() - new Date(birthDate).getTime()
-    age = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
+    const parts = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (parts) {
+      const bDate = new Date(+parts[1], +parts[2] - 1, +parts[3])
+      const now = new Date()
+      age = now.getFullYear() - bDate.getFullYear()
+      if (now.getMonth() < bDate.getMonth() ||
+          (now.getMonth() === bDate.getMonth() && now.getDate() < bDate.getDate())) {
+        age--
+      }
+      dob = bDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    }
   }
-  let dob = birthDate
-  if (birthDate) {
-    const d = new Date(birthDate)
-    dob = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  }
+
   return { name, initials, age, gender, dob, phone, email, mrn: patientId }
 }
 
