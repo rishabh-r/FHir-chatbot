@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { callFhirApi, buildUrl } from '../services/fhir'
+import { callFhirApi } from '../services/fhir'
+import { FHIR_BASE } from '../config'
 import { formatDisplayName } from '../utils'
 import '../dashboard.css'
 
-function parsePatientResource(entry, patientId) {
-  const resource = entry?.[0]?.resource
+function parsePatientFromResource(resource, patientId) {
   if (!resource) return null
-  console.log('[Dashboard] Raw FHIR Patient resource:', JSON.stringify(resource, null, 2))
+  console.log('[Dashboard] FHIR Patient resource:', JSON.stringify(resource, null, 2))
 
   let name = 'Unknown'
   if (resource.name?.length) {
@@ -34,7 +34,6 @@ function parsePatientResource(entry, patientId) {
     if (t.system === 'phone' && phone === '—') phone = t.value
     if (t.system === 'email' && email === '—') email = t.value
   }
-  if (phone === '—' && telecoms.length > 0) phone = telecoms[0]?.value || '—'
 
   let age = '—', dob = '—'
   const birthDate = resource.birthDate || ''
@@ -180,16 +179,29 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!localStorage.getItem('cb_token')) { navigate('/'); return }
+
+    const minLoadTime = new Promise(r => setTimeout(r, 2400))
+
     async function fetchPatient() {
       try {
-        const url = buildUrl('/baseR4/Patient', { _id: patientId })
-        const result = await callFhirApi(url)
-        const parsed = parsePatientResource(result?.entry, patientId)
+        const directUrl = `${FHIR_BASE}/baseR4/Patient/${patientId}`
+        console.log('[Dashboard] Fetching patient:', directUrl)
+        const result = await callFhirApi(directUrl)
+        console.log('[Dashboard] API response:', JSON.stringify(result, null, 2))
+
+        let parsed = null
+        if (result?.resourceType === 'Patient') {
+          parsed = parsePatientFromResource(result, patientId)
+        } else if (result?.entry?.length) {
+          parsed = parsePatientFromResource(result.entry[0].resource, patientId)
+        }
         if (parsed) setPatient(parsed)
-      } catch (e) { /* will fall back to mock */ }
-      setIsLoading(false)
+      } catch (e) {
+        console.error('[Dashboard] Patient fetch failed:', e)
+      }
     }
-    fetchPatient()
+
+    Promise.all([fetchPatient(), minLoadTime]).then(() => setIsLoading(false))
   }, [navigate, patientId])
 
   const d = MOCK_DATA
