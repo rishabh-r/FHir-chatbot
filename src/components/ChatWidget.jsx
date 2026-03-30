@@ -48,13 +48,16 @@ function ChartRenderer({ chartData }) {
   )
 }
 
-function CareCordButton() {
+function CareCordButton({ patientId }) {
   const [isHovered, setIsHovered] = useState(false)
+  const dashboardUrl = patientId
+    ? `${window.location.origin}/dashboard?patient=${patientId}`
+    : `${window.location.origin}/dashboard`
   return (
     <>
       <br />
       <button
-        onClick={() => window.open('https://hull-act-74080093.figma.site/care-manager/P-001', '_blank')}
+        onClick={() => window.open(dashboardUrl, '_blank')}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
@@ -75,7 +78,7 @@ function CareCordButton() {
   )
 }
 
-function MessageRow({ role, content, time, userInitial, showCareCordBtn }) {
+function MessageRow({ role, content, time, userInitial, showCareCordBtn, patientId }) {
   const isBot = role === 'bot'
   const { cleanText, chartData } = isBot ? extractChartData(content || '') : { cleanText: content, chartData: null }
 
@@ -89,7 +92,7 @@ function MessageRow({ role, content, time, userInitial, showCareCordBtn }) {
           <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '80%' }}>
             <div className="msg-bubble" dangerouslySetInnerHTML={{ __html: simpleMarkdown(cleanText) }} />
             {chartData && <ChartRenderer chartData={chartData} />}
-            {showCareCordBtn && <CareCordButton />}
+            {showCareCordBtn && <CareCordButton patientId={patientId} />}
             <span className="msg-time">{time}</span>
           </div>
         </>
@@ -283,10 +286,12 @@ function ChatWidget({ userName, userInitial }) {
           conversationHistoryRef.current.push({ role: 'assistant', content: finalText })
 
           setStreamingContent(null)
+          const isCareGap = userMessage.toLowerCase().includes('care gap')
           setMessages(prev => [...prev, {
             id: nextId(), role: 'bot', content: finalText,
             time: chunkAccum ? streamTimeStamp : formatTime(),
-            showCareCordBtn: userMessage.toLowerCase().includes('care gap')
+            showCareCordBtn: isCareGap,
+            patientId: isCareGap ? currentPatientRef.current?.id : null
           }])
           break
         }
@@ -430,6 +435,7 @@ function ChatWidget({ userName, userInitial }) {
               time={msg.time}
               userInitial={userInitial}
               showCareCordBtn={msg.showCareCordBtn}
+              patientId={msg.patientId}
             />
           ))}
           {streamingContent !== null && (
