@@ -1,9 +1,0 @@
-.env
-*.env
-.DS_Store
-Thumbs.db
-.claude/
-.vscode/
-.idea/
-node_modules/
-dist/
