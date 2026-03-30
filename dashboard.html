@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patient 360 Portal</title>
+  <link rel="icon" href="chatbot_image/chatbot.png" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="loader-spinner"></div>
+    <p class="loading-text">Analyzing patient data with AI...</p>
+    <p class="loading-subtext">Fetching clinical records and generating insights</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="error-state" class="hidden">
+    <div class="error-card">
+      <div class="error-icon">!</div>
+      <h2>Something went wrong</h2>
+      <p id="error-message"></p>
+      <button class="retry-btn" onclick="location.reload()">Retry</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+
+    <!-- Header -->
+    <header id="dashboard-header">
+      <div class="header-left">
+        <img src="images/LogoRsi.png" alt="RSI" class="header-logo" />
+        <span class="header-brand">Patient 360 Portal</span>
+      </div>
+      <nav class="header-nav">
+        <a class="nav-item nav-active">CARE MANAGER</a>
+        <a class="nav-item">PROVIDER</a>
+        <a class="nav-item">PATIENTS</a>
+      </nav>
+      <div class="header-right">
+        <div class="notif-wrap">
+          <span class="notif-icon">&#128276;</span>
+          <span class="notif-dot">3</span>
+        </div>
+        <div class="user-info-wrap">
+          <span class="user-name-text" id="header-user-name">Admin</span>
+          <span class="user-role-text">ADMIN</span>
+        </div>
+        <div class="user-avatar-header" id="header-user-avatar">A</div>
+      </div>
+    </header>
+
+    <!-- Page -->
+    <div class="page-container">
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb-row">
+        <div class="breadcrumb-left">
+          <button class="back-btn" onclick="window.history.length > 1 ? window.history.back() : window.close()">&#8592;</button>
+          <div>
+            <div class="breadcrumb-path">Care Manager Dashboard &rsaquo; <span id="breadcrumb-patient-name" class="breadcrumb-patient">Loading...</span></div>
+            <div class="breadcrumb-sub">Patient Profile &amp; Care Management</div>
+          </div>
+        </div>
+        <div class="breadcrumb-actions">
+          <a href="#vitals-section" class="quick-action-btn">&#9883; Vitals</a>
+          <a href="#medications-section" class="quick-action-btn">&#128138; Medications</a>
+          <a href="#appointments-section" class="quick-action-btn">&#128197; Appointments</a>
+        </div>
+      </div>
+
+      <!-- Patient Card (full width) -->
+      <section id="patient-card">
+        <div class="patient-card-left">
+          <div class="patient-avatar" id="patient-avatar"></div>
+          <div class="patient-info">
+            <div class="patient-name-row">
+              <h2 id="patient-name"></h2>
+              <div id="patient-badges"></div>
+            </div>
+            <div class="patient-details-row" id="patient-details-row"></div>
+            <div class="patient-contact-row" id="patient-contact-row"></div>
+          </div>
+        </div>
+        <button id="mark-reviewed-btn">&#10003; Mark as Reviewed</button>
+      </section>
+
+      <!-- Two-column main layout -->
+      <div class="main-layout">
+
+        <!-- Left Column -->
+        <div class="left-col">
+
+          <!-- Alert Triggers -->
+          <section id="alert-section">
+            <div class="section-header">
+              <span class="alert-circle-icon">&#9888;</span>
+              <div>
+                <h3>Alert Triggers &amp; Risk Drivers</h3>
+                <p class="section-subtitle">AI-detected issues requiring immediate attention</p>
+              </div>
+            </div>
+            <div id="alert-cards-container" class="alert-cards-grid"></div>
+            <div id="trends-section">
+              <div class="trends-title-row">
+                <span class="trend-arrow-icon">&#8599;</span>
+                <span class="trends-title-text">Deteriorating Clinical Trends</span>
+              </div>
+              <div id="trends-container" class="trends-row"></div>
+            </div>
+          </section>
+
+          <!-- Tabs -->
+          <div class="tabs-bar">
+            <button class="tab active" data-tab="ai-actions">&#9881; AI Actions</button>
+            <button class="tab disabled" data-tab="clinical-trends">&#8635; Clinical Trends</button>
+            <button class="tab disabled" data-tab="task-queue">&#9776; Task Queue</button>
+            <button class="tab disabled" data-tab="patient-outreach">&#128172; Patient Outreach</button>
+          </div>
+
+          <!-- AI Actions Tab -->
+          <section id="ai-actions-tab">
+            <div class="actions-header">
+              <div>
+                <h3>AI-Recommended Actions</h3>
+                <p class="section-subtitle">Select actions to approve and create tasks (<span id="selected-count">0</span> selected)</p>
+              </div>
+              <button id="approve-btn" class="approve-btn">&#10004; Approve Selected (<span id="approve-count">0</span>)</button>
+            </div>
+            <div id="actions-list"></div>
+          </section>
+
+          <!-- Vitals -->
+          <section id="vitals-section" class="info-section">
+            <div class="info-section-header">
+              <h3>Vitals</h3>
+              <p class="section-subtitle" id="vitals-updated">Last updated: —</p>
+            </div>
+            <div id="vitals-grid" class="vitals-grid"></div>
+          </section>
+
+          <!-- Medications -->
+          <section id="medications-section" class="info-section">
+            <div class="info-section-header">
+              <h3>Current Medications</h3>
+              <p class="section-subtitle" id="meds-count"></p>
+            </div>
+            <div id="medications-list"></div>
+          </section>
+
+          <!-- Appointments -->
+          <section id="appointments-section" class="info-section">
+            <div class="info-section-header">
+              <h3>Appointments</h3>
+              <p class="section-subtitle">Upcoming and recent visits</p>
+            </div>
+            <div id="appointments-list"></div>
+          </section>
+
+        </div><!-- /left-col -->
+
+        <!-- Right Column -->
+        <div class="right-col">
+
+          <!-- Care Team -->
+          <section id="care-team-section" class="info-section">
+            <div class="care-team-header">
+              <div class="section-title-row-sm">
+                <span class="section-icon-sm">&#128100;</span>
+                <h3>Care Team</h3>
+              </div>
+              <p class="section-subtitle" id="care-team-count"></p>
+            </div>
+            <div id="care-team-list"></div>
+          </section>
+
+          <!-- Clinical Notes -->
+          <section id="clinical-notes-section" class="info-section">
+            <div class="clinical-notes-top">
+              <div>
+                <h3>Clinical Notes</h3>
+                <p class="section-subtitle" id="notes-count"></p>
+              </div>
+              <button class="add-note-btn">&#128196; Add Note</button>
+            </div>
+            <div id="notes-filter-bar" class="notes-filter-bar"></div>
+            <div id="clinical-notes-list"></div>
+          </section>
+
+        </div><!-- /right-col -->
+
+      </div><!-- /main-layout -->
+
+    </div><!-- /page-container -->
+  </div><!-- /dashboard -->
+
+  <!-- Approve Modal -->
+  <div id="approve-modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Approve &amp; Create Tasks</h2>
+          <p class="modal-subtitle">Review selected actions and add coordinator notes before creating tasks</p>
+        </div>
+        <button class="modal-close" id="modal-close-x">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-section-label">Selected Actions (<span id="modal-action-count">0</span>):</p>
+        <div id="modal-actions-list" class="modal-actions-list"></div>
+        <p class="modal-section-label" style="margin-top:20px;">Coordinator Notes (Optional)</p>
+        <textarea id="coordinator-notes" class="coordinator-notes" placeholder="Add any additional context or special instructions for task execution..."></textarea>
+        <div class="assignment-box">
+          <p class="assignment-title">Assignment:</p>
+          <p class="assignment-text">Tasks will be created and assigned to <strong>your task queue</strong> for immediate action</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-cancel" id="modal-cancel-btn"><span class="cancel-x">&times;</span> Cancel</button>
+        <button class="modal-confirm" id="modal-confirm-btn">&#10003; Confirm &amp; Create Tasks</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
