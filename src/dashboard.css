@@ -111,6 +111,8 @@
   cursor: pointer; white-space: nowrap; transition: all .2s;
 }
 .dash-review-btn:hover { border-color: #4F46E5; color: #4F46E5; }
+.dash-review-btn.reviewed { background: #16A34A; color: white; border-color: #16A34A; }
+.dash-review-btn.reviewed:hover { background: #15803D; border-color: #15803D; }
 
 /* ── Pills / Badges ── */
 .dash-pill {

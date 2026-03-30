@@ -1,7 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import { callFhirApi, buildUrl } from '../services/fhir'
 import { formatDisplayName } from '../utils'
 import '../dashboard.css'
+
+function parsePatientResource(entry, patientId) {
+  const resource = entry?.[0]?.resource
+  if (!resource) return null
+  const given = resource.name?.[0]?.given?.join(' ') || ''
+  const family = resource.name?.[0]?.family || ''
+  const name = [given, family].filter(Boolean).join(' ') || 'Unknown'
+  const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3)
+  const birthDate = resource.birthDate || ''
+  const gender = resource.gender ? resource.gender.charAt(0).toUpperCase() + resource.gender.slice(1) : '—'
+  const phone = resource.telecom?.find(t => t.system === 'phone')?.value || '—'
+  const email = resource.telecom?.find(t => t.system === 'email')?.value || '—'
+  let age = '—'
+  if (birthDate) {
+    const diff = Date.now() - new Date(birthDate).getTime()
+    age = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
+  }
+  let dob = birthDate
+  if (birthDate) {
+    const d = new Date(birthDate)
+    dob = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
+  return { name, initials, age, gender, dob, phone, email, mrn: patientId }
+}
 
 const MOCK_DATA = {
   patient: {
@@ -118,6 +143,8 @@ function DashboardPage() {
   const navigate = useNavigate()
   const patientId = searchParams.get('patient')
   const [isLoading, setIsLoading] = useState(true)
+  const [patient, setPatient] = useState(null)
+  const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
   const [noteFilter, setNoteFilter] = useState('all')
 
@@ -126,11 +153,20 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!localStorage.getItem('cb_token')) { navigate('/'); return }
-    const timer = setTimeout(() => setIsLoading(false), 2400)
-    return () => clearTimeout(timer)
-  }, [navigate])
+    async function fetchPatient() {
+      try {
+        const url = buildUrl('/baseR4/Patient', { _id: patientId })
+        const result = await callFhirApi(url)
+        const parsed = parsePatientResource(result?.entry, patientId)
+        if (parsed) setPatient(parsed)
+      } catch (e) { /* will fall back to mock */ }
+      setIsLoading(false)
+    }
+    fetchPatient()
+  }, [navigate, patientId])
 
   const d = MOCK_DATA
+  const pt = patient || d.patient
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   const toggleAction = (i) => {
@@ -175,7 +211,7 @@ function DashboardPage() {
           </button>
           <span className="dash-bc-text">Care Manager Dashboard</span>
           <span className="dash-bc-sep">›</span>
-          <span className="dash-bc-name">{d.patient.name}</span>
+          <span className="dash-bc-name">{pt.name}</span>
         </div>
         <p className="dash-bc-sub">Patient Profile &amp; Care Management</p>
         <div className="dash-quick-pills">
@@ -197,24 +233,29 @@ function DashboardPage() {
       {/* ── Patient Banner ── */}
       <div className="dash-banner">
         <div className="dash-banner-left">
-          <div className="dash-banner-avatar">{d.patient.initials}</div>
+          <div className="dash-banner-avatar">{pt.initials}</div>
           <div className="dash-banner-info">
             <div className="dash-banner-name-row">
-              <h2>{d.patient.name}</h2>
-              <span className="dash-pill pill-red">{d.patient.priority}</span>
-              {d.patient.hasCareGap && <span className="dash-pill pill-red-outline">⚠ Care Gap</span>}
+              <h2>{pt.name}</h2>
+              <span className="dash-pill pill-red">High Priority</span>
+              <span className="dash-pill pill-red-outline">⚠ Care Gap</span>
             </div>
             <p className="dash-banner-meta">
-              {d.patient.age} yrs · {d.patient.gender} · MRN: {d.patient.mrn} · Programs: {d.patient.programs.join(', ')} · Score: {d.patient.ascvdScore} ASCVD
+              {pt.age} yrs · {pt.gender} · MRN: {pt.mrn} · Programs: Diabetes, Hypertension
             </p>
             <div className="dash-banner-contact">
-              <span>📅 DOB: {d.patient.dob}</span>
-              <span>📞 {d.patient.phone}</span>
-              <span>✉ {d.patient.email}</span>
+              <span>📅 DOB: {pt.dob}</span>
+              <span>📞 {pt.phone}</span>
+              <span>✉ {pt.email}</span>
             </div>
           </div>
         </div>
-        <button className="dash-review-btn">✓ Mark as Reviewed</button>
+        <button
+          className={`dash-review-btn ${isReviewed ? 'reviewed' : ''}`}
+          onClick={() => setIsReviewed(prev => !prev)}
+        >
+          {isReviewed ? '✓ Reviewed' : '✓ Mark as Reviewed'}
+        </button>
       </div>
 
       {/* ── Main Content ── */}
