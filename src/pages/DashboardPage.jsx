@@ -124,7 +124,9 @@ function PatientCard({ patient, ptResource, onMarkReviewed }) {
 
   const gender = ptResource?.gender
     ? ptResource.gender.charAt(0).toUpperCase() + ptResource.gender.slice(1) : ''
-  const dob = ptResource?.birthDate ? formatDate(ptResource.birthDate) : ''
+  const dobRaw = ptResource?.birthDate || ''
+  const dobYear = dobRaw ? parseInt(dobRaw.split('-')[0]) : 0
+  const dob = dobRaw && dobYear <= new Date().getFullYear() ? formatDate(dobRaw) : ''
 
   const riskColors = {
     high:     { text: '#b91c1c', borderLeft: '#ef4444', bg: '#fff9f9', border: '#fde8e8' },
@@ -186,8 +188,8 @@ function PatientCard({ patient, ptResource, onMarkReviewed }) {
           </div>
           <div className="patient-contact-row">
             {dob && <div className="contact-item"><span>📅</span> DOB: {dob}</div>}
-            {patient.phone && <div className="contact-item"><span>📞</span> {patient.phone}</div>}
-            {patient.email && <div className="contact-item"><span>✉</span> {patient.email}</div>}
+            {patient.phone && patient.phone !== 'N/A' && <div className="contact-item"><span>📞</span> {patient.phone}</div>}
+            {patient.email && patient.email !== 'N/A' && <div className="contact-item"><span>✉</span> {patient.email}</div>}
           </div>
         </div>
       </div>
