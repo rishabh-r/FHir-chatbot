@@ -49,7 +49,7 @@ export async function executeTool(name, args, onPatientFound) {
           const rGiven  = resource?.name?.[0]?.given?.join(' ') || args.GIVEN || ''
           const rFamily = resource?.name?.[0]?.family || args.FAMILY || ''
           const fullName = [rGiven, rFamily].filter(Boolean).join(' ')
-          if (fullName && onPatientFound) onPatientFound({ name: fullName, id })
+          if (fullName && onPatientFound) onPatientFound({ name: fullName, id, resource })
         } catch (e) { /* ignore */ }
         return patientResult
       }

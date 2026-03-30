@@ -183,12 +183,18 @@ function DashboardPage() {
     const minLoadTime = new Promise(r => setTimeout(r, 2400))
 
     async function fetchPatient() {
+      const cached = sessionStorage.getItem('dashboard_patient_' + patientId)
+      if (cached) {
+        try {
+          const resource = JSON.parse(cached)
+          const parsed = parsePatientFromResource(resource, patientId)
+          if (parsed) { setPatient(parsed); return }
+        } catch (_) {}
+      }
+
       try {
         const directUrl = `${FHIR_BASE}/baseR4/Patient/${patientId}`
-        console.log('[Dashboard] Fetching patient:', directUrl)
         const result = await callFhirApi(directUrl)
-        console.log('[Dashboard] API response:', JSON.stringify(result, null, 2))
-
         let parsed = null
         if (result?.resourceType === 'Patient') {
           parsed = parsePatientFromResource(result, patientId)
@@ -196,9 +202,7 @@ function DashboardPage() {
           parsed = parsePatientFromResource(result.entry[0].resource, patientId)
         }
         if (parsed) setPatient(parsed)
-      } catch (e) {
-        console.error('[Dashboard] Patient fetch failed:', e)
-      }
+      } catch (_) {}
     }
 
     Promise.all([fetchPatient(), minLoadTime]).then(() => setIsLoading(false))

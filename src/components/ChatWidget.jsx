@@ -199,6 +199,9 @@ function ChatWidget({ userName, userInitial }) {
 
   const onPatientFound = useCallback((patient) => {
     currentPatientRef.current = patient
+    if (patient.resource) {
+      try { sessionStorage.setItem('dashboard_patient_' + patient.id, JSON.stringify(patient.resource)) } catch (_) {}
+    }
   }, [])
 
   const agentLoop = useCallback(async (userMessage) => {
