@@ -146,109 +146,6 @@ Rules:
   return JSON.parse(cleaned)
 }
 
-const KNOWN_NORMALS = {
-  'BLOOD PRESSURE': '120/80 mmHg', 'SYSTOLIC BLOOD PRESSURE': '90-120 mmHg', 'DIASTOLIC BLOOD PRESSURE': '60-80 mmHg',
-  'HEART RATE': '60-100 bpm', 'BODY TEMPERATURE': '97-99 °F', 'TEMPERATURE': '97-99 °F',
-  'RESPIRATORY RATE': '12-20 /min', 'OXYGEN SATURATION': '95-100 %', 'SPO2': '95-100 %',
-  'BLOOD GLUCOSE': '70-130 mg/dL', 'GLUCOSE': '70-130 mg/dL', 'FASTING GLUCOSE': '70-100 mg/dL',
-  'HBA1C': '<5.7 %', 'HEMOGLOBIN A1C': '<5.7 %', 'GLYCATED HEMOGLOBIN': '<5.7 %',
-  'HEMOGLOBIN': '12-17 g/dL', 'CREATININE': '0.6-1.2 mg/dL', 'SERUM CREATININE': '0.6-1.2 mg/dL',
-  'BUN': '7-20 mg/dL', 'BLOOD UREA NITROGEN': '7-20 mg/dL', 'EGFR': '>60 mL/min',
-  'POTASSIUM': '3.5-5.0 mEq/L', 'SODIUM': '136-145 mEq/L', 'CALCIUM': '8.5-10.5 mg/dL',
-  'CHOLESTEROL': '<200 mg/dL', 'TOTAL CHOLESTEROL': '<200 mg/dL',
-  'LDL': '<100 mg/dL', 'HDL': '>40 mg/dL', 'TRIGLYCERIDES': '<150 mg/dL',
-  'BMI': '18.5-24.9 kg/m²', 'BODY MASS INDEX': '18.5-24.9 kg/m²',
-  'WEIGHT': '', 'HEIGHT': '', 'BODY WEIGHT': '', 'BODY HEIGHT': '',
-  'WBC': '4500-11000 /µL', 'WHITE BLOOD CELLS': '4500-11000 /µL',
-  'PLATELETS': '150000-400000 /µL', 'ALT': '7-56 U/L', 'AST': '10-40 U/L',
-  'ALBUMIN': '3.5-5.5 g/dL', 'TSH': '0.4-4.0 mIU/L', 'URINE PROTEIN': 'Negative',
-}
-
-function determineVitalStatus(name, value) {
-  const upper = name.toUpperCase()
-  const num = parseFloat(String(value).replace(/[^\d.-]/g, ''))
-  if (isNaN(num)) return 'normal'
-  if (upper.includes('HBA1C') || upper.includes('GLYCATED')) {
-    if (num >= 10) return 'critical'
-    if (num >= 7) return 'elevated'
-    return num <= 5.7 ? 'normal' : 'elevated'
-  }
-  if (upper.includes('GLUCOSE')) {
-    if (num > 300 || num < 50) return 'critical'
-    if (num > 130 || num < 70) return 'elevated'
-    return 'normal'
-  }
-  if (upper.includes('CREATININE')) {
-    if (num > 3) return 'critical'
-    if (num > 1.2) return 'elevated'
-    return 'normal'
-  }
-  if (upper.includes('SYSTOLIC') || (upper.includes('BLOOD PRESSURE') && !upper.includes('DIASTOLIC'))) {
-    if (num >= 180) return 'critical'
-    if (num >= 140) return 'elevated'
-    if (num < 90) return 'low'
-    return 'normal'
-  }
-  if (upper.includes('POTASSIUM')) {
-    if (num < 3.0 || num > 6.0) return 'critical'
-    if (num < 3.5 || num > 5.0) return 'elevated'
-    return 'normal'
-  }
-  if (upper.includes('EGFR')) {
-    if (num < 15) return 'critical'
-    if (num < 60) return 'elevated'
-    return 'normal'
-  }
-  return 'normal'
-}
-
-function parseVitalsFromObservations(bundle) {
-  if (!bundle) { console.warn('[Vitals] No bundle received'); return null }
-  const entries = bundle.entry || []
-  console.log('[Vitals] Bundle type:', bundle.resourceType, 'total:', bundle.total, 'entries:', entries.length, 'raw keys:', Object.keys(bundle))
-  if (!entries.length) { console.warn('[Vitals] No entries in bundle'); return null }
-  const latest = {}
-  let skipped = 0
-  for (const e of entries) {
-    const r = e.resource || e
-    if (r.resourceType !== 'Observation') { skipped++; continue }
-    const code = r.code?.coding?.[0]?.display || r.code?.text || ''
-    if (!code) continue
-    const date = r.effectiveDateTime || r.issued || ''
-    let value = ''
-    let unit = ''
-    if (r.valueQuantity) {
-      value = String(r.valueQuantity.value ?? '')
-      unit = r.valueQuantity.unit || r.valueQuantity.code || ''
-    } else if (r.valueString) {
-      value = r.valueString
-    } else if (r.component?.length) {
-      const parts = r.component.map(c => {
-        const cv = c.valueQuantity ? `${c.valueQuantity.value}` : ''
-        return cv
-      }).filter(Boolean)
-      if (parts.length === 2) value = `${parts[0]}/${parts[1]}`
-      unit = r.component[0]?.valueQuantity?.unit || 'mmHg'
-    }
-    if (!value) { skipped++; continue }
-    const refText = r.referenceRange?.[0]?.text || ''
-    const key = code.toUpperCase()
-    if (!latest[key] || date > latest[key].date) {
-      latest[key] = { name: key, value, unit, date, normal: refText || KNOWN_NORMALS[key] || '', code }
-    }
-  }
-  console.log('[Vitals] Parsed', Object.keys(latest).length, 'unique vitals, skipped', skipped, 'entries. Types:', Object.keys(latest).join(', '))
-  return Object.values(latest)
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-    .map(v => ({
-      name: v.name,
-      value: v.value,
-      unit: v.unit,
-      normal: v.normal,
-      status: determineVitalStatus(v.name, v.value)
-    }))
-}
-
 function parseMedsFromFhir(bundle) {
   if (!bundle?.entry?.length) return null
   const meds = []
@@ -446,7 +343,6 @@ function DashboardPage() {
   const [alertsData, setAlertsData] = useState(null)
   const [trendsData, setTrendsData] = useState(null)
   const [aiActionsData, setAiActionsData] = useState(null)
-  const [vitalsData, setVitalsData] = useState(null)
   const [medsData, setMedsData] = useState(null)
   const [showAllMeds, setShowAllMeds] = useState(false)
   const [isReviewed, setIsReviewed] = useState(false)
@@ -490,24 +386,16 @@ function DashboardPage() {
 
       if (loadStepRef.current) loadStepRef.current(1)
 
-      // Always fetch Observations + MedicationRequests directly from FHIR
-      const fhirDirectPromise = Promise.all([
-        callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Vitals fetch failed:', e); return null }),
-        callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Meds fetch failed:', e); return null })
-      ]).then(([obsBundle, medBundle]) => {
-        console.log('[Dashboard] Obs bundle:', obsBundle ? `${obsBundle.resourceType}, total=${obsBundle.total}, entries=${obsBundle.entry?.length}` : 'null')
-        console.log('[Dashboard] Med bundle:', medBundle ? `${medBundle.resourceType}, total=${medBundle.total}, entries=${medBundle.entry?.length}` : 'null')
-        const parsedVitals = parseVitalsFromObservations(obsBundle)
-        if (parsedVitals?.length) {
-          console.log('[Dashboard] Parsed', parsedVitals.length, 'vitals from FHIR Observations')
-          setVitalsData(parsedVitals)
-        }
-        const parsedMeds = parseMedsFromFhir(medBundle)
-        if (parsedMeds?.length) {
-          console.log('[Dashboard] Parsed', parsedMeds.length, 'medications from FHIR MedicationRequest')
-          setMedsData(parsedMeds)
-        }
-      })
+      // Fetch MedicationRequests directly from FHIR
+      const fhirDirectPromise = callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 }))
+        .then(medBundle => {
+          const parsedMeds = parseMedsFromFhir(medBundle)
+          if (parsedMeds?.length) {
+            console.log('[Dashboard] Parsed', parsedMeds.length, 'medications from FHIR MedicationRequest')
+            setMedsData(parsedMeds)
+          }
+        })
+        .catch(e => console.warn('[Dashboard] Meds fetch failed:', e))
 
       try {
         const careGapText = sessionStorage.getItem('dashboard_caregap_' + patientId)
@@ -826,25 +714,21 @@ function DashboardPage() {
           {/* Vitals */}
           <div id="vitals-section" className="dash-card">
             <div className="dash-card-head">
-              <h3>Vitals &amp; Observations</h3>
-              <p>{(vitalsData || d.vitals).length} latest readings</p>
+              <h3>Vitals</h3>
+              <p>Last updated: Today, 9:30 AM</p>
             </div>
             <div className="dash-vitals-grid">
-              {(vitalsData || d.vitals).map((v, i) => {
-                const st = v.status || 'normal'
-                const pct = st === 'critical' ? 95 : st === 'elevated' ? 78 : st === 'low' ? 25 : 50
-                return (
-                  <div key={i} className={`dash-vital ${st}`}>
-                    <div className="dash-vital-icon">{VITAL_ICONS[v.name] || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>}</div>
-                    <div className="dash-vital-data">
-                      <span className="dash-vital-label">{v.name}</span>
-                      <span className={`dash-vital-value ${st}`}>{v.value} <small>{v.unit}</small></span>
-                      <div className={`dash-vital-bar ${st}`}><div style={{ width: `${pct}%` }}></div></div>
-                    </div>
-                    <div className="dash-vital-normal">Normal<br /><b>{v.normal}</b></div>
+              {d.vitals.map((v, i) => (
+                <div key={i} className={`dash-vital ${v.status}`}>
+                  <div className="dash-vital-icon">{VITAL_ICONS[v.name]}</div>
+                  <div className="dash-vital-data">
+                    <span className="dash-vital-label">{v.name}</span>
+                    <span className={`dash-vital-value ${v.status}`}>{v.value} <small>{v.unit}</small></span>
+                    <div className={`dash-vital-bar ${v.status}`}><div style={{ width: `${v.pct}%` }}></div></div>
                   </div>
-                )
-              })}
+                  <div className="dash-vital-normal">Normal<br /><b>{v.normal}</b></div>
+                </div>
+              ))}
             </div>
           </div>
 
