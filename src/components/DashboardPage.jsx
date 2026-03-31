@@ -225,7 +225,7 @@ function parseEncountersFromFhir(bundle) {
     })
   }
   encounters.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || ''))
-  return encounters.length ? encounters : null
+  return encounters.length ? encounters.slice(0, 15) : null
 }
 
 function parsePatientFromResource(resource, patientId) {
@@ -401,6 +401,7 @@ function DashboardPage() {
   const [encData, setEncData] = useState(null)
   const [missedAppts, setMissedAppts] = useState(null)
   const [showAllMeds, setShowAllMeds] = useState(false)
+  const [showAllAppts, setShowAllAppts] = useState(false)
   const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
   const [approvedActions, setApprovedActions] = useState([])
@@ -854,26 +855,36 @@ function DashboardPage() {
                 const key = `${a.title}|${a.date}`
                 if (!seen.has(key)) { seen.add(key); deduped.push(a) }
               }
-              return deduped.map((a, i) => (
-                <div key={i} className={`dash-appt-row ${a.isMissed ? 'missed' : ''}`}>
-                  <div className="dash-appt-info">
-                    <div className="dash-appt-title">
-                      <strong>{a.title}</strong>
-                      {a.isMissed
-                        ? <span className="dash-pill pill-missed">Missed</span>
-                        : <span className={`dash-pill pill-${a.status}`}>{a.status === 'upcoming' ? 'Upcoming' : a.status === 'completed' ? 'Completed' : a.status}</span>
-                      }
-                      {a.telehealth && <span className="dash-pill pill-telehealth">📹 Telehealth</span>}
+              const visible = showAllAppts ? deduped : deduped.slice(0, 4)
+              return (
+                <>
+                  {visible.map((a, i) => (
+                    <div key={i} className={`dash-appt-row ${a.isMissed ? 'missed' : ''}`}>
+                      <div className="dash-appt-info">
+                        <div className="dash-appt-title">
+                          <strong>{a.title}</strong>
+                          {a.isMissed
+                            ? <span className="dash-pill pill-missed">Missed</span>
+                            : <span className={`dash-pill pill-${a.status}`}>{a.status === 'upcoming' ? 'Upcoming' : a.status === 'completed' ? 'Completed' : a.status}</span>
+                          }
+                          {a.telehealth && <span className="dash-pill pill-telehealth">📹 Telehealth</span>}
+                        </div>
+                        {a.with && <p>{a.isMissed ? a.with : `with ${a.with}`}</p>}
+                        <p className="dash-appt-meta">
+                          {a.date && <>📅 {a.date}</>}
+                          {a.time && <>&nbsp; ⏰ {a.time}</>}
+                          {a.location && <>&nbsp; 📍 {a.location}</>}
+                        </p>
+                      </div>
                     </div>
-                    {a.with && <p>{a.isMissed ? a.with : `with ${a.with}`}</p>}
-                    <p className="dash-appt-meta">
-                      {a.date && <>📅 {a.date}</>}
-                      {a.time && <>&nbsp; ⏰ {a.time}</>}
-                      {a.location && <>&nbsp; 📍 {a.location}</>}
-                    </p>
-                  </div>
-                </div>
-              ))
+                  ))}
+                  {deduped.length > 4 && (
+                    <button className="dash-show-more-btn" onClick={() => setShowAllAppts(v => !v)}>
+                      {showAllAppts ? '▲ Show Less' : `▼ Show All (${deduped.length - 4} more)`}
+                    </button>
+                  )}
+                </>
+              )
             })()}
           </div>
         </div>
