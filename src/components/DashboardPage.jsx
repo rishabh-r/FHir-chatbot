@@ -71,6 +71,9 @@ Return ONLY valid JSON (no markdown fences, no explanation). Use this exact stru
   ],
   "trends": [
     { "label": "SHORT_LABEL", "value": "specific value or trend with units", "status": "critical|high|medium" }
+  ],
+  "aiActions": [
+    { "title": "action title", "priority": "High Priority|Medium Priority|Low Priority", "timeframe": "Within 24 hours|Within 48 hours|Within 1 week|During next contact", "description": "what to do", "rationale": "why AI recommends this" }
   ]
 }
 
@@ -87,7 +90,13 @@ Rules:
   * Lab values: HBA1C, GLUCOSE, CREATININE, LDL, TRIGLYCERIDES, CRP, ACR, ALBUMIN, etc. Show value + (Normal: X) + status e.g. "11.8% (Normal: <5.6%) ↑ HIGH"
   * Clinical conditions: DKA EPISODES, NEPHROPATHY, FOOT ULCER, SEPSIS, NEUROPATHY etc. Show severity/frequency.
   * Be thorough - include EVERY abnormal observation and deteriorating condition mentioned. Do NOT skip any.
-  * Label must be uppercase short name. Aim for 5-10+ trends if the data supports it.`
+  * Label must be uppercase short name. Aim for 5-10+ trends if the data supports it.
+- aiActions: Generate 4-6 recommended actions based on the care gaps. Each must have:
+  * title: specific actionable task (e.g. "Urgent Patient Outreach - Phone Call", "Medication Reconciliation", "Reschedule Cardiology Appointment", "Provider Alert", "Send Educational Materials", "Social Determinants Screening")
+  * priority: "High Priority", "Medium Priority", or "Low Priority" based on urgency
+  * timeframe: "Within 24 hours", "Within 48 hours", "Within 1 week", or "During next contact"
+  * description: 1-2 sentences on what to do
+  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings`
 
   const userContent = inputText
 
@@ -102,7 +111,7 @@ Rules:
       ],
       stream: true,
       temperature: 0.2,
-      max_tokens: 2000
+      max_tokens: 3500
     })
   })
 
@@ -305,8 +314,13 @@ function DashboardPage() {
   const [patient, setPatient] = useState(null)
   const [alertsData, setAlertsData] = useState(null)
   const [trendsData, setTrendsData] = useState(null)
+  const [aiActionsData, setAiActionsData] = useState(null)
   const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
+  const [approvedActions, setApprovedActions] = useState([])
+  const [showModal, setShowModal] = useState(false)
+  const [coordinatorNotes, setCoordinatorNotes] = useState('')
+  const [approveAlert, setApproveAlert] = useState(false)
   const [noteFilter, setNoteFilter] = useState('all')
   const loadStepRef = useRef(null)
 
@@ -366,6 +380,7 @@ function DashboardPage() {
         const aiResult = await callAIForAnalysis(inputForAI)
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
+        if (aiResult?.aiActions) setAiActionsData(aiResult.aiActions)
       } catch (e) {
         console.error('[Dashboard] AI analysis failed:', e)
       }
@@ -379,7 +394,25 @@ function DashboardPage() {
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   const toggleAction = (i) => {
+    if (approvedActions.includes(i)) return
     setSelectedActions(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
+  }
+
+  const handleApprove = () => {
+    setShowModal(false)
+    setApprovedActions(prev => [...new Set([...prev, ...selectedActions])])
+    setSelectedActions([])
+    setCoordinatorNotes('')
+    setApproveAlert(true)
+    setTimeout(() => setApproveAlert(false), 2000)
+  }
+
+  const priorityClass = (p) => {
+    if (!p) return 'medium'
+    const l = p.toLowerCase()
+    if (l.includes('high')) return 'high'
+    if (l.includes('low')) return 'low'
+    return 'medium'
   }
 
   const filteredNotes = noteFilter === 'all' ? d.clinicalNotes
@@ -549,26 +582,91 @@ function DashboardPage() {
                 <h3>AI-Recommended Actions</h3>
                 <p>Select actions to approve and create tasks ({selectedActions.length} selected)</p>
               </div>
-              <button className="dash-approve-btn">✓ Approve Selected ({selectedActions.length})</button>
+              <div className="dash-actions-head-right">
+                {approveAlert && <span className="dash-approve-alert">✓ Tasks approved successfully!</span>}
+                <button
+                  className="dash-approve-btn"
+                  disabled={selectedActions.length === 0}
+                  onClick={() => setShowModal(true)}
+                >
+                  ✓ Approve Selected ({selectedActions.length})
+                </button>
+              </div>
             </div>
-            {d.aiActions.map((a, i) => (
-              <div key={i} className={`dash-action-row ${selectedActions.includes(i) ? 'selected' : ''}`}>
-                <input type="checkbox" checked={selectedActions.includes(i)} onChange={() => toggleAction(i)} />
-                <div className="dash-action-body">
-                  <div className="dash-action-title-row">
-                    <strong>{a.title}</strong>
-                    <span className={`dash-pill pill-${a.priorityClass}`}>{a.priority}</span>
-                    <span className="dash-action-time">⏱ {a.timeframe}</span>
-                  </div>
-                  <p>{a.description}</p>
-                  <div className="dash-rationale">
-                    <span className="dash-rationale-tag">AI RATIONALE:</span>
-                    <em>{a.rationale}</em>
+            {(aiActionsData || d.aiActions).map((a, i) => {
+              const isApproved = approvedActions.includes(i)
+              return (
+                <div key={i} className={`dash-action-row ${selectedActions.includes(i) ? 'selected' : ''} ${isApproved ? 'approved' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedActions.includes(i) || isApproved}
+                    onChange={() => toggleAction(i)}
+                    disabled={isApproved}
+                  />
+                  <div className="dash-action-body">
+                    <div className="dash-action-title-row">
+                      <strong>{a.title}</strong>
+                      <span className={`dash-pill pill-${a.priorityClass || priorityClass(a.priority)}`}>{a.priority}</span>
+                      <span className="dash-action-time">⏱ {a.timeframe}</span>
+                    </div>
+                    <p>{a.description}</p>
+                    <div className="dash-rationale">
+                      <span className="dash-rationale-tag">AI RATIONALE:</span>
+                      <em>{a.rationale}</em>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
+
+          {/* Approve Modal */}
+          {showModal && (
+            <div className="dash-modal-overlay" onClick={() => setShowModal(false)}>
+              <div className="dash-modal" onClick={e => e.stopPropagation()}>
+                <div className="dash-modal-header">
+                  <div>
+                    <h3>Approve &amp; Create Tasks</h3>
+                    <p>Review selected actions and add coordinator notes before creating tasks</p>
+                  </div>
+                  <button className="dash-modal-close" onClick={() => setShowModal(false)}>✕</button>
+                </div>
+                <div className="dash-modal-body">
+                  <p className="dash-modal-label">Selected Actions ({selectedActions.length}):</p>
+                  <div className="dash-modal-actions-list">
+                    {selectedActions.map(i => {
+                      const a = (aiActionsData || d.aiActions)[i]
+                      return (
+                        <div key={i} className="dash-modal-action-item">
+                          <span className="dash-modal-check">✓</span>
+                          <div>
+                            <strong>{a.title}</strong>
+                            <p>{a.description}</p>
+                          </div>
+                          <span className={`dash-pill pill-${a.priorityClass || priorityClass(a.priority)}`}>{a.priority}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="dash-modal-label">Coordinator Notes (Optional)</p>
+                  <textarea
+                    className="dash-modal-textarea"
+                    placeholder="Add any additional context or special instructions for task execution..."
+                    value={coordinatorNotes}
+                    onChange={e => setCoordinatorNotes(e.target.value)}
+                  />
+                  <div className="dash-modal-assignment">
+                    <strong>Assignment:</strong>
+                    <p>Tasks will be created and assigned to <b>your task queue</b> for immediate action.</p>
+                  </div>
+                </div>
+                <div className="dash-modal-footer">
+                  <button className="dash-modal-cancel" onClick={() => setShowModal(false)}>✕ Cancel</button>
+                  <button className="dash-modal-confirm" onClick={handleApprove}>✓ Confirm &amp; Create Tasks</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Vitals */}
           <div id="vitals-section" className="dash-card">

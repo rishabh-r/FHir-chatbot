@@ -352,6 +352,90 @@
 .dash-note-text { font-size: 12px; color: #475569; line-height: 1.6; margin: 0 0 6px; }
 .dash-note-date { font-size: 11px; color: #94A3B8; margin: 0; }
 
+/* ── Approve Alert ── */
+.dash-actions-head-right { display: flex; align-items: center; gap: 12px; }
+.dash-approve-alert {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px;
+  background: #DCFCE7; color: #16A34A; font-size: 13px; font-weight: 600;
+  animation: fadeInOut 2s ease-in-out;
+}
+@keyframes fadeInOut { 0% { opacity:0; } 15% { opacity:1; } 85% { opacity:1; } 100% { opacity:0; } }
+.dash-approve-btn:disabled { opacity: .45; cursor: not-allowed; }
+.dash-action-row.approved { opacity: .55; pointer-events: none; background: #F8FAF8; }
+.dash-action-row.approved input[type="checkbox"] { accent-color: #16A34A; }
+
+/* ── Modal ── */
+.dash-modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.dash-modal {
+  width: 560px; max-width: 92vw; max-height: 85vh;
+  background: white; border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.dash-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 24px 24px 16px; border-bottom: 1px solid #E2E8F0;
+}
+.dash-modal-header h3 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+.dash-modal-header p { font-size: 13px; color: #64748B; margin: 0; }
+.dash-modal-close {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid #E2E8F0;
+  background: white; cursor: pointer; font-size: 16px; color: #64748B;
+  display: flex; align-items: center; justify-content: center;
+}
+.dash-modal-close:hover { border-color: #EF4444; color: #EF4444; }
+.dash-modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.dash-modal-label { font-size: 13px; font-weight: 700; color: #1E293B; margin: 0 0 10px; }
+.dash-modal-actions-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
+.dash-modal-action-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px; border-radius: 10px; border: 1px solid #E2E8F0; background: #FAFBFC;
+}
+.dash-modal-check {
+  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+  background: #4F46E5; color: white; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 2px;
+}
+.dash-modal-action-item strong { font-size: 14px; display: block; margin-bottom: 4px; }
+.dash-modal-action-item p { font-size: 12px; color: #64748B; margin: 0; }
+.dash-modal-action-item .dash-pill { flex-shrink: 0; margin-left: auto; }
+.dash-modal-textarea {
+  width: 100%; min-height: 80px; padding: 12px; border-radius: 10px;
+  border: 1px solid #E2E8F0; font-size: 13px; font-family: inherit;
+  resize: vertical; margin-bottom: 16px; color: #1E293B;
+}
+.dash-modal-textarea:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+.dash-modal-textarea::placeholder { color: #94A3B8; }
+.dash-modal-assignment {
+  padding: 14px; border-radius: 10px; background: #FFFBEB; border-left: 3px solid #F59E0B;
+}
+.dash-modal-assignment strong { font-size: 13px; color: #92400E; display: block; margin-bottom: 4px; }
+.dash-modal-assignment p { font-size: 13px; color: #78716C; margin: 0; }
+.dash-modal-assignment b { color: #4F46E5; }
+.dash-modal-footer {
+  display: flex; justify-content: center; gap: 12px;
+  padding: 16px 24px; border-top: 1px solid #E2E8F0;
+}
+.dash-modal-cancel {
+  padding: 10px 24px; border-radius: 10px; border: 1px solid #E2E8F0;
+  background: white; font-size: 13px; font-weight: 500; color: #475569;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.dash-modal-cancel:hover { border-color: #EF4444; color: #EF4444; }
+.dash-modal-confirm {
+  padding: 10px 24px; border-radius: 10px; border: none;
+  background: #16A34A; color: white; font-size: 13px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.dash-modal-confirm:hover { background: #15803D; }
+
 /* ── Responsive ── */
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }
