@@ -169,7 +169,23 @@
   background: #F8FAFC; border: 1px solid #E2E8F0;
 }
 .dash-trends-label { font-size: 12px; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.dash-trends-vals { display: flex; gap: 24px; font-size: 12px; color: #64748B; flex-wrap: wrap; }
+.dash-trends-scroll {
+  display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px;
+  scrollbar-width: thin; scrollbar-color: #C7D2FE #F1F5F9;
+}
+.dash-trends-scroll::-webkit-scrollbar { height: 5px; }
+.dash-trends-scroll::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 3px; }
+.dash-trends-scroll::-webkit-scrollbar-thumb { background: #C7D2FE; border-radius: 3px; }
+.dash-trend-chip {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: 8px 14px; border-radius: 8px; border: 1px solid #E2E8F0;
+  background: white; font-size: 12px; white-space: nowrap;
+}
+.dash-trend-lbl { font-weight: 600; color: #64748B; letter-spacing: .3px; }
+.dash-trend-chip b { font-weight: 700; }
+.dash-trend-chip.critical b { color: #DC2626; }
+.dash-trend-chip.high b { color: #EA580C; }
+.dash-trend-chip.medium b { color: #D97706; }
 .val-red { color: #DC2626; }
 .val-orange { color: #EA580C; }
 

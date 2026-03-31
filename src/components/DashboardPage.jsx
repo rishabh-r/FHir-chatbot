@@ -1,9 +1,114 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { callFhirApi } from '../services/fhir'
+import { callFhirApi, buildUrl } from '../services/fhir'
 import { FHIR_BASE } from '../config'
 import { formatDisplayName } from '../utils'
 import '../dashboard.css'
+
+const ALERT_ICONS = { 'Clinical Deterioration': '⚠', 'Medication Non-Adherence': '💊', 'Missed Follow-Up Appointments': '📅' }
+
+function summarizeFhirData(observations, encounters, medications) {
+  const obs = (observations?.entry || []).slice(0, 60).map(e => {
+    const r = e.resource
+    return {
+      code: r.code?.coding?.[0]?.display || r.code?.text || '',
+      value: r.valueQuantity ? `${r.valueQuantity.value} ${r.valueQuantity.unit || ''}` : r.valueString || '',
+      date: r.effectiveDateTime || r.issued || '',
+      ref: r.referenceRange?.[0]?.text || ''
+    }
+  }).filter(o => o.code && o.value)
+
+  const enc = (encounters?.entry || []).slice(0, 40).map(e => {
+    const r = e.resource
+    return {
+      type: r.type?.[0]?.coding?.[0]?.display || r.type?.[0]?.text || '',
+      status: r.status || '',
+      class: r.class?.display || r.class?.code || '',
+      date: r.period?.start || '',
+      location: r.location?.[0]?.location?.display || '',
+      locationStatus: r.location?.[0]?.status || ''
+    }
+  })
+
+  const med = (medications?.entry || []).slice(0, 40).map(e => {
+    const r = e.resource
+    return {
+      name: r.medicationCodeableConcept?.coding?.[0]?.display || r.medicationCodeableConcept?.text || '',
+      status: r.status || '',
+      authored: r.authoredOn || '',
+      note: r.note?.[0]?.text || ''
+    }
+  }).filter(m => m.name)
+
+  return { observations: obs, encounters: enc, medications: med }
+}
+
+async function callAIForAnalysis(patientName, fhirSummary) {
+  const systemPrompt = `You are a clinical AI analyst. Analyze the patient's FHIR data and return ONLY valid JSON (no markdown fences, no explanation). Use this exact structure:
+{
+  "alerts": [
+    { "title": "Clinical Deterioration", "detail": "one-line summary of most concerning abnormal reading with value", "severity": "CRITICAL" },
+    { "title": "Medication Non-Adherence", "detail": "one-line summary of worst medication gap with duration in days", "severity": "HIGH" },
+    { "title": "Missed Follow-Up Appointments", "detail": "one-line summary of latest missed appointment", "severity": "MEDIUM" }
+  ],
+  "trends": [
+    { "label": "SHORT_NAME", "value": "current value or trend e.g. 7.2% → 11.8%", "status": "critical|high|medium" }
+  ]
+}
+Rules:
+- alerts: ALWAYS return exactly 3 alerts in this order: Clinical Deterioration, Medication Non-Adherence, Missed Follow-Up Appointments
+- For severity: use CRITICAL if life-threatening or far from normal, HIGH if significant concern, MEDIUM if moderate concern. Analyze the actual data.
+- For detail: be specific with values, dates, medication names. Keep under 80 chars.
+- trends: include ALL observations with abnormal/worsening values. Show trend arrow "→" if multiple readings. Label should be uppercase short name (HBA1C, GLUCOSE, LDL, CREATININE, etc). Status reflects severity.
+- If data is insufficient for an alert, still include it with detail "No data available" and severity "MEDIUM".`
+
+  const userContent = `Patient: ${patientName}\n\nFHIR Data:\n${JSON.stringify(fhirSummary)}`
+
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      stream: true,
+      temperature: 0.2,
+      max_tokens: 2000
+    })
+  })
+
+  if (!res.ok) throw new Error(`AI API error: ${res.status}`)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let text = '', buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (data === '[DONE]' || !data) continue
+      try {
+        const parsed = JSON.parse(data)
+        const delta = parsed.choices?.[0]?.delta?.content
+        if (delta) text += delta
+      } catch (_) {}
+    }
+  }
+
+  let cleaned = text.trim()
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+  }
+  return JSON.parse(cleaned)
+}
 
 function parsePatientFromResource(resource, patientId) {
   if (!resource) return null
@@ -134,15 +239,16 @@ const VITAL_ICONS = {
   'TEMPERATURE': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
 }
 
-function LoadingScreen() {
+function LoadingScreen({ stepRef }) {
   const [step, setStep] = useState(0)
-  const steps = ['Fetching Patient Data...', 'Analyzing Clinical Trends...', 'Generating Recommendations...']
+  const steps = ['Fetching Patient Data...', 'Analyzing Clinical Trends...', 'Generating AI Insights...']
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStep(1), 800)
-    const t2 = setTimeout(() => setStep(2), 1600)
+    if (stepRef) stepRef.current = setStep
+    const t1 = setTimeout(() => setStep(s => Math.max(s, 1)), 1200)
+    const t2 = setTimeout(() => setStep(s => Math.max(s, 2)), 2200)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [])
+  }, [stepRef])
 
   return (
     <div className="dash-loading">
@@ -170,9 +276,12 @@ function DashboardPage() {
   const patientId = searchParams.get('patient')
   const [isLoading, setIsLoading] = useState(true)
   const [patient, setPatient] = useState(null)
+  const [alertsData, setAlertsData] = useState(null)
+  const [trendsData, setTrendsData] = useState(null)
   const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
   const [noteFilter, setNoteFilter] = useState('all')
+  const loadStepRef = useRef(null)
 
   const rawUser = localStorage.getItem('cb_user') || 'User'
   const userName = formatDisplayName(rawUser)
@@ -180,32 +289,52 @@ function DashboardPage() {
   useEffect(() => {
     if (!localStorage.getItem('cb_token')) { navigate('/'); return }
 
-    const minLoadTime = new Promise(r => setTimeout(r, 2400))
+    const minLoadTime = new Promise(r => setTimeout(r, 2800))
 
-    async function fetchPatient() {
+    async function loadDashboard() {
+      let patientName = 'Patient'
+
       const cached = sessionStorage.getItem('dashboard_patient_' + patientId)
       if (cached) {
         try {
           const resource = JSON.parse(cached)
           const parsed = parsePatientFromResource(resource, patientId)
-          if (parsed) { setPatient(parsed); return }
+          if (parsed) { setPatient(parsed); patientName = parsed.name }
+        } catch (_) {}
+      }
+      if (!patient) {
+        try {
+          const directUrl = `${FHIR_BASE}/baseR4/Patient/${patientId}`
+          const result = await callFhirApi(directUrl)
+          let parsed = null
+          if (result?.resourceType === 'Patient') parsed = parsePatientFromResource(result, patientId)
+          else if (result?.entry?.length) parsed = parsePatientFromResource(result.entry[0].resource, patientId)
+          if (parsed) { setPatient(parsed); patientName = parsed.name }
         } catch (_) {}
       }
 
+      if (loadStepRef.current) loadStepRef.current(1)
+
       try {
-        const directUrl = `${FHIR_BASE}/baseR4/Patient/${patientId}`
-        const result = await callFhirApi(directUrl)
-        let parsed = null
-        if (result?.resourceType === 'Patient') {
-          parsed = parsePatientFromResource(result, patientId)
-        } else if (result?.entry?.length) {
-          parsed = parsePatientFromResource(result.entry[0].resource, patientId)
-        }
-        if (parsed) setPatient(parsed)
-      } catch (_) {}
+        const [obsResult, encResult, medResult] = await Promise.all([
+          callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId })).catch(() => null),
+          callFhirApi(buildUrl('/baseR4/Encounter', { subject: patientId })).catch(() => null),
+          callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId })).catch(() => null)
+        ])
+
+        if (loadStepRef.current) loadStepRef.current(2)
+
+        const summary = summarizeFhirData(obsResult, encResult, medResult)
+        const aiResult = await callAIForAnalysis(patientName, summary)
+
+        if (aiResult?.alerts) setAlertsData(aiResult.alerts)
+        if (aiResult?.trends) setTrendsData(aiResult.trends)
+      } catch (e) {
+        console.error('[Dashboard] AI analysis failed:', e)
+      }
     }
 
-    Promise.all([fetchPatient(), minLoadTime]).then(() => setIsLoading(false))
+    Promise.all([loadDashboard(), minLoadTime]).then(() => setIsLoading(false))
   }, [navigate, patientId])
 
   const d = MOCK_DATA
@@ -219,7 +348,14 @@ function DashboardPage() {
   const filteredNotes = noteFilter === 'all' ? d.clinicalNotes
     : d.clinicalNotes.filter(n => n.type.toLowerCase() === noteFilter)
 
-  if (isLoading) return <LoadingScreen />
+  const dynAlerts = alertsData || d.alerts.map(a => ({ title: a.title, detail: a.detail, severity: a.severity.toUpperCase() }))
+  const dynTrends = trendsData || [
+    { label: 'BP TREND', value: d.trends.bp, status: 'critical' },
+    { label: 'HBA1C', value: d.trends.hba1c, status: 'high' },
+    { label: 'LDL', value: d.trends.ldl, status: 'medium' }
+  ]
+
+  if (isLoading) return <LoadingScreen stepRef={loadStepRef} />
 
   return (
     <div className="dash-page">
@@ -316,14 +452,14 @@ function DashboardPage() {
                 <p>AI-detected issues requiring immediate attention</p>
               </div>
               <div className="dash-alert-list">
-                {d.alerts.map((a, i) => (
+                {dynAlerts.map((a, i) => (
                   <div key={i} className="dash-alert-item">
-                    <span className="dash-alert-icon">{a.icon}</span>
+                    <span className="dash-alert-icon">{ALERT_ICONS[a.title] || '⚠'}</span>
                     <div className="dash-alert-body">
                       <strong>{a.title}</strong>
                       <p>{a.detail}</p>
                     </div>
-                    <span className={`dash-pill pill-${a.severity}`}>{a.severity.toUpperCase()}</span>
+                    <span className={`dash-pill pill-${a.severity.toLowerCase()}`}>{a.severity}</span>
                   </div>
                 ))}
               </div>
@@ -332,10 +468,13 @@ function DashboardPage() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" width="16" height="16"><path d="M23 6l-9.5 9.5-5-5L1 18"/></svg>
                   DETERIORATING CLINICAL TRENDS
                 </div>
-                <div className="dash-trends-vals">
-                  <span>BP TREND: <b className="val-red">{d.trends.bp}</b></span>
-                  <span>HBA1C: <b className="val-orange">{d.trends.hba1c}</b></span>
-                  <span>LDL: <b>{d.trends.ldl}</b></span>
+                <div className="dash-trends-scroll">
+                  {dynTrends.map((t, i) => (
+                    <div key={i} className={`dash-trend-chip ${t.status}`}>
+                      <span className="dash-trend-lbl">{t.label}</span>
+                      <b>{t.value}</b>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
