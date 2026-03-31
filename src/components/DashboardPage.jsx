@@ -74,6 +74,12 @@ Return ONLY valid JSON (no markdown fences, no explanation). Use this exact stru
   ],
   "aiActions": [
     { "title": "action title", "priority": "High Priority|Medium Priority|Low Priority", "timeframe": "Within 24 hours|Within 48 hours|Within 1 week|During next contact", "description": "what to do", "rationale": "why AI recommends this" }
+  ],
+  "vitals": [
+    { "name": "VITAL NAME", "value": "numeric value", "unit": "unit", "normal": "normal range", "status": "elevated|low|normal|critical" }
+  ],
+  "medications": [
+    { "name": "Drug Name", "dose": "dose", "frequency": "how often", "status": "Active|On-hold|Discontinued", "note": "relevant note if any" }
   ]
 }
 
@@ -96,7 +102,20 @@ Rules:
   * priority: "High Priority", "Medium Priority", or "Low Priority" based on urgency
   * timeframe: "Within 24 hours", "Within 48 hours", "Within 1 week", or "During next contact"
   * description: 1-2 sentences on what to do
-  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings`
+  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings
+- vitals: Extract the LATEST observation/vital values mentioned. Include:
+  * name: uppercase (BLOOD PRESSURE, HEART RATE, BLOOD GLUCOSE, HBA1C, CREATININE, TEMPERATURE, etc.)
+  * value: the latest numeric value mentioned
+  * unit: the unit (mmHg, bpm, mg/dL, %, °F, etc.)
+  * normal: normal range (e.g. "120/80", "60-100", "<5.6%")
+  * status: "critical" if dangerously abnormal, "elevated" if above normal, "low" if below normal, "normal" if within range
+  * Include ALL observations mentioned with their latest values. Skip normals only if not mentioned.
+- medications: Extract ALL medications mentioned in the text. Include:
+  * name: drug name (e.g. Metformin, Empagliflozin, Insulin Glargine, Aspirin, Gabapentin, Furosemide, etc.)
+  * dose: dosage if mentioned (e.g. "500mg", "10mg"), or "" if unknown
+  * frequency: how often if mentioned (e.g. "Twice daily", "Once daily"), or "" if unknown
+  * status: "Active", "On-hold", or "Discontinued" based on what the text says
+  * note: brief relevant note (e.g. "Self-discontinued due to GI side effects", "Dose doubled for fluid retention")`
 
   const userContent = inputText
 
@@ -111,7 +130,7 @@ Rules:
       ],
       stream: true,
       temperature: 0.2,
-      max_tokens: 3500
+      max_tokens: 5000
     })
   })
 
@@ -315,6 +334,9 @@ function DashboardPage() {
   const [alertsData, setAlertsData] = useState(null)
   const [trendsData, setTrendsData] = useState(null)
   const [aiActionsData, setAiActionsData] = useState(null)
+  const [vitalsData, setVitalsData] = useState(null)
+  const [medsData, setMedsData] = useState(null)
+  const [showAllMeds, setShowAllMeds] = useState(false)
   const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
   const [approvedActions, setApprovedActions] = useState([])
@@ -381,6 +403,8 @@ function DashboardPage() {
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
         if (aiResult?.aiActions) setAiActionsData(aiResult.aiActions)
+        if (aiResult?.vitals) setVitalsData(aiResult.vitals)
+        if (aiResult?.medications) setMedsData(aiResult.medications)
       } catch (e) {
         console.error('[Dashboard] AI analysis failed:', e)
       }
@@ -671,21 +695,25 @@ function DashboardPage() {
           {/* Vitals */}
           <div id="vitals-section" className="dash-card">
             <div className="dash-card-head">
-              <h3>Vitals</h3>
-              <p>Last updated: Today, 9:30 AM</p>
+              <h3>Vitals &amp; Observations</h3>
+              <p>{(vitalsData || d.vitals).length} latest readings</p>
             </div>
             <div className="dash-vitals-grid">
-              {d.vitals.map((v, i) => (
-                <div key={i} className={`dash-vital ${v.status}`}>
-                  <div className="dash-vital-icon">{VITAL_ICONS[v.name]}</div>
-                  <div className="dash-vital-data">
-                    <span className="dash-vital-label">{v.name}</span>
-                    <span className={`dash-vital-value ${v.status}`}>{v.value} <small>{v.unit}</small></span>
-                    <div className={`dash-vital-bar ${v.status}`}><div style={{ width: `${v.pct}%` }}></div></div>
+              {(vitalsData || d.vitals).map((v, i) => {
+                const st = v.status || 'normal'
+                const pct = st === 'critical' ? 95 : st === 'elevated' ? 78 : st === 'low' ? 25 : 50
+                return (
+                  <div key={i} className={`dash-vital ${st}`}>
+                    <div className="dash-vital-icon">{VITAL_ICONS[v.name] || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>}</div>
+                    <div className="dash-vital-data">
+                      <span className="dash-vital-label">{v.name}</span>
+                      <span className={`dash-vital-value ${st}`}>{v.value} <small>{v.unit}</small></span>
+                      <div className={`dash-vital-bar ${st}`}><div style={{ width: `${pct}%` }}></div></div>
+                    </div>
+                    <div className="dash-vital-normal">Normal<br /><b>{v.normal}</b></div>
                   </div>
-                  <div className="dash-vital-normal">Normal<br /><b>{v.normal}</b></div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -693,20 +721,33 @@ function DashboardPage() {
           <div id="meds-section" className="dash-card">
             <div className="dash-card-head">
               <h3>Current Medications</h3>
-              <p>{d.medications.length} active prescriptions</p>
+              <p>{(medsData || d.medications).length} medications</p>
             </div>
-            {d.medications.map((m, i) => (
-              <div key={i} className="dash-med-row">
-                <div className="dash-med-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" width="18" height="18"><path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 18h6"/></svg>
-                </div>
-                <div className="dash-med-info">
-                  <div className="dash-med-name">{m.name} <span className="dash-pill pill-active">Active</span></div>
-                  <p>{m.dose} · {m.frequency}</p>
-                  <p className="dash-med-doc">{m.doctor} · Started {m.started}</p>
-                </div>
-              </div>
-            ))}
+            {(() => {
+              const allMeds = medsData || d.medications
+              const visible = showAllMeds ? allMeds : allMeds.slice(0, 3)
+              const statusClass = s => s === 'Discontinued' ? 'pill-discontinued' : s === 'On-hold' ? 'pill-onhold' : 'pill-active'
+              return (
+                <>
+                  {visible.map((m, i) => (
+                    <div key={i} className="dash-med-row">
+                      <div className="dash-med-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" width="18" height="18"><path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 18h6"/></svg>
+                      </div>
+                      <div className="dash-med-info">
+                        <div className="dash-med-name">{m.name} {m.dose && <small>({m.dose})</small>} <span className={`dash-pill ${statusClass(m.status)}`}>{m.status || 'Active'}</span></div>
+                        <p>{[m.frequency, m.note].filter(Boolean).join(' · ') || 'No additional details'}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {allMeds.length > 3 && (
+                    <button className="dash-show-more-btn" onClick={() => setShowAllMeds(v => !v)}>
+                      {showAllMeds ? '▲ Show Less' : `▼ Show All (${allMeds.length - 3} more)`}
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
 
           {/* Appointments */}
