@@ -59,29 +59,35 @@ function summarizeFhirData(observations, encounters, medications, conditions) {
   return { observations: obs, encounters: enc, medications: med, conditions: cond }
 }
 
-async function callAIForAnalysis(patientName, fhirSummary) {
-  const systemPrompt = `You are a clinical AI analyst. Analyze the patient's FHIR data (conditions, encounters, medications, observations) and return ONLY valid JSON (no markdown fences, no explanation). Use this exact structure:
+async function callAIForAnalysis(inputText) {
+  const systemPrompt = `You are a clinical AI analyst. You will receive a care gap analysis text from a chatbot. Extract and structure the information into JSON.
+
+Return ONLY valid JSON (no markdown fences, no explanation). Use this exact structure:
 {
   "alerts": [
-    { "title": "Clinical Deterioration", "detail": "one-line summary of most concerning clinical issue with specific condition/value", "severity": "CRITICAL" },
-    { "title": "Medication Non-Adherence", "detail": "one-line summary of worst medication gap with medication name and duration", "severity": "HIGH" },
-    { "title": "Missed Follow-Up Appointments", "detail": "one-line summary of missed/no-show appointments with latest date and clinic", "severity": "MEDIUM" }
+    { "title": "Clinical Deterioration", "detail": "one-line: most concerning clinical finding with specific value/condition name", "severity": "CRITICAL|HIGH|MEDIUM" },
+    { "title": "Medication Non-Adherence", "detail": "one-line: worst medication gap with drug name and gap duration", "severity": "CRITICAL|HIGH|MEDIUM" },
+    { "title": "Missed Follow-Up Appointments", "detail": "one-line: latest missed appointment with clinic name and date", "severity": "CRITICAL|HIGH|MEDIUM" }
   ],
   "trends": [
-    { "label": "SHORT_NAME", "value": "current value or trend e.g. 7.2% → 11.8%", "status": "critical|high|medium" }
+    { "label": "SHORT_LABEL", "value": "specific value or trend with units", "status": "critical|high|medium" }
   ]
 }
-Rules:
-- alerts: ALWAYS return exactly 3 alerts in this order. Analyze ALL available data:
-  * Clinical Deterioration: Use conditions (diagnoses like DKA, nephropathy), observations (abnormal labs), and emergency encounters. Show specific values/conditions.
-  * Medication Non-Adherence: Use medications with "on-hold"/"stopped" status and notes about self-discontinuation. Show medication name and gap.
-  * Missed Follow-Up: Use encounters where location status is "N/A", "NO SHOW", or similar. Show clinic name and date.
-- severity: CRITICAL = life-threatening/recurring emergencies, HIGH = significant concern, MEDIUM = moderate concern.
-- detail: be specific with values, dates, medication names. Keep under 90 chars.
-- trends: include ALL deteriorating clinical findings from observations AND conditions. For observations, show value trends with "→". For conditions, show the condition progression. Label should be uppercase short name (HBA1C, GLUCOSE, LDL, CREATININE, DKA EPISODES, NEPHROPATHY, etc). Must have at least 3 trends if data exists.
-- If data is truly empty for a category, use detail "No data available" and severity "MEDIUM".`
 
-  const userContent = `Patient: ${patientName}\n\nFHIR Data:\n${JSON.stringify(fhirSummary)}`
+Rules:
+- alerts: ALWAYS return exactly 3 in this order. Extract from the text:
+  * Clinical Deterioration: emergencies, worsening conditions, abnormal labs. Be specific with condition names and values.
+  * Medication Non-Adherence: self-discontinued meds, gaps, on-hold medications. Include drug name and gap duration.
+  * Missed Follow-Up: no-show appointments, missed clinics. Include clinic name and date.
+- severity: CRITICAL = life-threatening/recurring emergencies, HIGH = significant concern, MEDIUM = moderate
+- detail: specific values, dates, drug names. Max 90 chars.
+- trends: Extract ALL deteriorating findings mentioned in the text. Include:
+  * Lab value trends (HBA1C, GLUCOSE, CREATININE, LDL, TRIGLYCERIDES, CRP, ACR etc.) with values and arrows "→" for trends
+  * Clinical conditions (DKA EPISODES, NEPHROPATHY, FOOT ULCER, SEPSIS etc.)
+  * Any other worsening metric mentioned
+  * Label must be uppercase short name. Include at least 3-5 trends.`
+
+  const userContent = inputText
 
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -335,21 +341,27 @@ function DashboardPage() {
       if (loadStepRef.current) loadStepRef.current(1)
 
       try {
-        const [obsResult, encResult, medResult, condResult] = await Promise.all([
-          callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Observations fetch:', e.message); return null }),
-          callFhirApi(buildUrl('/baseR4/Encounter', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Encounter fetch:', e.message); return null }),
-          callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] MedicationRequest fetch:', e.message); return null }),
-          callFhirApi(buildUrl('/baseR4/Condition', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Condition fetch:', e.message); return null })
-        ])
+        const careGapText = sessionStorage.getItem('dashboard_caregap_' + patientId)
 
-        console.log('[Dashboard] FHIR totals - Obs:', obsResult?.total, 'Enc:', encResult?.total, 'Med:', medResult?.total, 'Cond:', condResult?.total)
+        let inputForAI = null
+        if (careGapText) {
+          console.log('[Dashboard] Using chatbot care gap text for analysis')
+          inputForAI = `Care Gap Analysis for ${patientName}:\n\n${careGapText}`
+        } else {
+          console.log('[Dashboard] No chatbot text, fetching FHIR data as fallback')
+          const [obsResult, encResult, medResult, condResult] = await Promise.all([
+            callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 })).catch(() => null),
+            callFhirApi(buildUrl('/baseR4/Encounter', { subject: patientId, page: 0 })).catch(() => null),
+            callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(() => null),
+            callFhirApi(buildUrl('/baseR4/Condition', { subject: patientId, page: 0 })).catch(() => null)
+          ])
+          const summary = summarizeFhirData(obsResult, encResult, medResult, condResult)
+          inputForAI = `Patient: ${patientName}\n\nFHIR Data:\n${JSON.stringify(summary)}`
+        }
 
         if (loadStepRef.current) loadStepRef.current(2)
 
-        const summary = summarizeFhirData(obsResult, encResult, medResult, condResult)
-        console.log('[Dashboard] Summary for AI:', { obs: summary.observations.length, enc: summary.encounters.length, med: summary.medications.length, cond: summary.conditions.length })
-        const aiResult = await callAIForAnalysis(patientName, summary)
-
+        const aiResult = await callAIForAnalysis(inputForAI)
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
       } catch (e) {

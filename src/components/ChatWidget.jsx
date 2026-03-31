@@ -290,11 +290,15 @@ function ChatWidget({ userName, userInitial }) {
 
           setStreamingContent(null)
           const isCareGap = userMessage.toLowerCase().includes('care gap')
+          const carePatientId = isCareGap ? currentPatientRef.current?.id : null
+          if (isCareGap && carePatientId) {
+            try { sessionStorage.setItem('dashboard_caregap_' + carePatientId, finalText) } catch (_) {}
+          }
           setMessages(prev => [...prev, {
             id: nextId(), role: 'bot', content: finalText,
             time: chunkAccum ? streamTimeStamp : formatTime(),
             showCareCordBtn: isCareGap,
-            patientId: isCareGap ? currentPatientRef.current?.id : null
+            patientId: carePatientId
           }])
           break
         }

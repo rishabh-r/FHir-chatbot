@@ -155,7 +155,8 @@
 .dash-card-head > div { display: flex; align-items: flex-start; justify-content: space-between; }
 
 /* ── Alerts Row ── */
-.dash-alerts-row { display: grid; grid-template-columns: 1fr 200px; gap: 20px; }
+.dash-alerts-row { display: grid; grid-template-columns: 1fr 200px; gap: 20px; min-width: 0; }
+.dash-alerts-row > .dash-card { min-width: 0; overflow: hidden; }
 .dash-alert-list { display: flex; flex-direction: column; gap: 10px; }
 .dash-alert-item {
   display: flex; align-items: center; gap: 12px;
@@ -167,6 +168,7 @@
 .dash-trends-bar {
   margin-top: 16px; padding: 14px; border-radius: 10px;
   background: #F8FAFC; border: 1px solid #E2E8F0;
+  min-width: 0; overflow: hidden;
 }
 .dash-trends-label { font-size: 12px; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dash-trends-scroll {
