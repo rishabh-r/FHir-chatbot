@@ -81,11 +81,13 @@ Rules:
   * Missed Follow-Up: no-show appointments, missed clinics. Include clinic name and date.
 - severity: CRITICAL = life-threatening/recurring emergencies, HIGH = significant concern, MEDIUM = moderate
 - detail: specific values, dates, drug names. Max 90 chars.
-- trends: Extract ALL deteriorating findings mentioned in the text. Include:
-  * Lab value trends (HBA1C, GLUCOSE, CREATININE, LDL, TRIGLYCERIDES, CRP, ACR etc.) with values and arrows "→" for trends
-  * Clinical conditions (DKA EPISODES, NEPHROPATHY, FOOT ULCER, SEPSIS etc.)
-  * Any other worsening metric mentioned
-  * Label must be uppercase short name. Include at least 3-5 trends.`
+- trends: Extract ALL abnormal/deteriorating observations and clinical findings. SKIP any values that are normal. For each trend include:
+  * The actual numeric value(s) with units. If multiple readings exist over time, show the trend with "→" (e.g. "7.2% → 11.8%").
+  * Classify each as "critical" (dangerously abnormal), "high" (significantly abnormal), or "medium" (mildly abnormal).
+  * Lab values: HBA1C, GLUCOSE, CREATININE, LDL, TRIGLYCERIDES, CRP, ACR, ALBUMIN, etc. Show value + (Normal: X) + status e.g. "11.8% (Normal: <5.6%) ↑ HIGH"
+  * Clinical conditions: DKA EPISODES, NEPHROPATHY, FOOT ULCER, SEPSIS, NEUROPATHY etc. Show severity/frequency.
+  * Be thorough - include EVERY abnormal observation and deteriorating condition mentioned. Do NOT skip any.
+  * Label must be uppercase short name. Aim for 5-10+ trends if the data supports it.`
 
   const userContent = inputText
 
