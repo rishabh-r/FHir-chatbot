@@ -228,7 +228,7 @@ function parseEncountersFromFhir(bundle) {
     })
   }
   encounters.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || ''))
-  return encounters.length ? encounters.slice(0, 15) : null
+  return encounters.length ? encounters.slice(0, 10) : null
 }
 
 function parsePatientFromResource(resource, patientId) {
