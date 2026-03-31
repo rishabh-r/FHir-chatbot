@@ -203,11 +203,15 @@ function determineVitalStatus(name, value) {
 }
 
 function parseVitalsFromObservations(bundle) {
-  if (!bundle?.entry?.length) return null
+  if (!bundle) { console.warn('[Vitals] No bundle received'); return null }
+  const entries = bundle.entry || []
+  console.log('[Vitals] Bundle type:', bundle.resourceType, 'total:', bundle.total, 'entries:', entries.length, 'raw keys:', Object.keys(bundle))
+  if (!entries.length) { console.warn('[Vitals] No entries in bundle'); return null }
   const latest = {}
-  for (const e of bundle.entry) {
-    const r = e.resource
-    if (r.resourceType !== 'Observation') continue
+  let skipped = 0
+  for (const e of entries) {
+    const r = e.resource || e
+    if (r.resourceType !== 'Observation') { skipped++; continue }
     const code = r.code?.coding?.[0]?.display || r.code?.text || ''
     if (!code) continue
     const date = r.effectiveDateTime || r.issued || ''
@@ -226,13 +230,14 @@ function parseVitalsFromObservations(bundle) {
       if (parts.length === 2) value = `${parts[0]}/${parts[1]}`
       unit = r.component[0]?.valueQuantity?.unit || 'mmHg'
     }
-    if (!value) continue
+    if (!value) { skipped++; continue }
     const refText = r.referenceRange?.[0]?.text || ''
     const key = code.toUpperCase()
     if (!latest[key] || date > latest[key].date) {
       latest[key] = { name: key, value, unit, date, normal: refText || KNOWN_NORMALS[key] || '', code }
     }
   }
+  console.log('[Vitals] Parsed', Object.keys(latest).length, 'unique vitals, skipped', skipped, 'entries. Types:', Object.keys(latest).join(', '))
   return Object.values(latest)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     .map(v => ({
@@ -490,6 +495,8 @@ function DashboardPage() {
         callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Vitals fetch failed:', e); return null }),
         callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Meds fetch failed:', e); return null })
       ]).then(([obsBundle, medBundle]) => {
+        console.log('[Dashboard] Obs bundle:', obsBundle ? `${obsBundle.resourceType}, total=${obsBundle.total}, entries=${obsBundle.entry?.length}` : 'null')
+        console.log('[Dashboard] Med bundle:', medBundle ? `${medBundle.resourceType}, total=${medBundle.total}, entries=${medBundle.entry?.length}` : 'null')
         const parsedVitals = parseVitalsFromObservations(obsBundle)
         if (parsedVitals?.length) {
           console.log('[Dashboard] Parsed', parsedVitals.length, 'vitals from FHIR Observations')
