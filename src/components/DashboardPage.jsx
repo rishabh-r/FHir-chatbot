@@ -75,9 +75,6 @@ Return ONLY valid JSON (no markdown fences, no explanation). Use this exact stru
   "aiActions": [
     { "title": "action title", "priority": "High Priority|Medium Priority|Low Priority", "timeframe": "Within 24 hours|Within 48 hours|Within 1 week|During next contact", "description": "what to do", "rationale": "why AI recommends this" }
   ],
-  "medications": [
-    { "name": "Drug Name", "dose": "dose", "frequency": "how often", "status": "Active|On-hold|Discontinued", "note": "relevant note if any" }
-  ]
 }
 
 Rules:
@@ -99,13 +96,7 @@ Rules:
   * priority: "High Priority", "Medium Priority", or "Low Priority" based on urgency
   * timeframe: "Within 24 hours", "Within 48 hours", "Within 1 week", or "During next contact"
   * description: 1-2 sentences on what to do
-  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings
-- medications: Extract ALL medications mentioned in the text. Include:
-  * name: drug name (e.g. Metformin, Empagliflozin, Insulin Glargine, Aspirin, Gabapentin, Furosemide, etc.)
-  * dose: dosage if mentioned (e.g. "500mg", "10mg"), or "" if unknown
-  * frequency: how often if mentioned (e.g. "Twice daily", "Once daily"), or "" if unknown
-  * status: "Active", "On-hold", or "Discontinued" based on what the text says
-  * note: brief relevant note (e.g. "Self-discontinued due to GI side effects", "Dose doubled for fluid retention")`
+  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings`
 
   const userContent = inputText
 
@@ -120,7 +111,7 @@ Rules:
       ],
       stream: true,
       temperature: 0.2,
-      max_tokens: 5000
+      max_tokens: 3500
     })
   })
 
@@ -251,6 +242,34 @@ function parseVitalsFromObservations(bundle) {
       normal: v.normal,
       status: determineVitalStatus(v.name, v.value)
     }))
+}
+
+function parseMedsFromFhir(bundle) {
+  if (!bundle?.entry?.length) return null
+  const meds = []
+  for (const e of bundle.entry) {
+    const r = e.resource
+    if (r.resourceType !== 'MedicationRequest') continue
+    const name = r.medicationCodeableConcept?.coding?.[0]?.display
+      || r.medicationCodeableConcept?.text || ''
+    if (!name) continue
+    const dosage = r.dosageInstruction?.[0] || {}
+    const dose = dosage.doseAndRate?.[0]?.doseQuantity
+      ? `${dosage.doseAndRate[0].doseQuantity.value}${dosage.doseAndRate[0].doseQuantity.unit || 'mg'}`
+      : dosage.text || ''
+    const freq = dosage.timing?.code?.text
+      || dosage.timing?.repeat?.frequency
+        ? `${dosage.timing?.repeat?.frequency}x/${dosage.timing?.repeat?.period || ''} ${dosage.timing?.repeat?.periodUnit || ''}`.trim()
+        : ''
+    const status = r.status
+      ? r.status.charAt(0).toUpperCase() + r.status.slice(1).replace(/-/g, ' ')
+      : 'Active'
+    const note = r.note?.[0]?.text || ''
+    const authored = r.authoredOn || ''
+    meds.push({ name, dose, frequency: freq || dose, status, note, authored })
+  }
+  meds.sort((a, b) => (b.authored || '').localeCompare(a.authored || ''))
+  return meds.length ? meds : null
 }
 
 function parsePatientFromResource(resource, patientId) {
@@ -466,16 +485,22 @@ function DashboardPage() {
 
       if (loadStepRef.current) loadStepRef.current(1)
 
-      // Always fetch Observations from FHIR for vitals (chatbot text doesn't include numeric values)
-      const vitalsPromise = callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 }))
-        .then(obsBundle => {
-          const parsed = parseVitalsFromObservations(obsBundle)
-          if (parsed?.length) {
-            console.log('[Dashboard] Parsed', parsed.length, 'vitals from FHIR Observations')
-            setVitalsData(parsed)
-          }
-        })
-        .catch(e => console.warn('[Dashboard] Vitals fetch failed:', e))
+      // Always fetch Observations + MedicationRequests directly from FHIR
+      const fhirDirectPromise = Promise.all([
+        callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Vitals fetch failed:', e); return null }),
+        callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Meds fetch failed:', e); return null })
+      ]).then(([obsBundle, medBundle]) => {
+        const parsedVitals = parseVitalsFromObservations(obsBundle)
+        if (parsedVitals?.length) {
+          console.log('[Dashboard] Parsed', parsedVitals.length, 'vitals from FHIR Observations')
+          setVitalsData(parsedVitals)
+        }
+        const parsedMeds = parseMedsFromFhir(medBundle)
+        if (parsedMeds?.length) {
+          console.log('[Dashboard] Parsed', parsedMeds.length, 'medications from FHIR MedicationRequest')
+          setMedsData(parsedMeds)
+        }
+      })
 
       try {
         const careGapText = sessionStorage.getItem('dashboard_caregap_' + patientId)
@@ -502,12 +527,11 @@ function DashboardPage() {
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
         if (aiResult?.aiActions) setAiActionsData(aiResult.aiActions)
-        if (aiResult?.medications) setMedsData(aiResult.medications)
       } catch (e) {
         console.error('[Dashboard] AI analysis failed:', e)
       }
 
-      await vitalsPromise
+      await fhirDirectPromise
     }
 
     Promise.all([loadDashboard(), minLoadTime]).then(() => setIsLoading(false))
