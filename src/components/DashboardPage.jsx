@@ -210,8 +210,11 @@ function parseEncountersFromFhir(bundle) {
     }
 
     let apptStatus = 'completed'
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const apptDate = startDate ? new Date(startDate) : null
     if (isMissed) apptStatus = 'missed'
-    else if (status === 'planned' || status === 'arrived' || status === 'in-progress') apptStatus = 'upcoming'
+    else if (apptDate && apptDate > today) apptStatus = 'upcoming'
 
     encounters.push({
       title: type || reason || 'Appointment',
