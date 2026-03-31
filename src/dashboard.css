@@ -449,6 +449,10 @@
 .pill-discontinued { background: #FEE2E2 !important; color: #DC2626 !important; }
 .pill-onhold { background: #FEF3C7 !important; color: #D97706 !important; }
 
+/* ── Missed appointment styling ── */
+.pill-missed { background: #FEE2E2 !important; color: #DC2626 !important; font-weight: 600; }
+.dash-appt-row.missed { border-left: 3px solid #EF4444; background: #FFF5F5; }
+
 /* ── Responsive ── */
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }

@@ -75,6 +75,9 @@ Return ONLY valid JSON (no markdown fences, no explanation). Use this exact stru
   "aiActions": [
     { "title": "action title", "priority": "High Priority|Medium Priority|Low Priority", "timeframe": "Within 24 hours|Within 48 hours|Within 1 week|During next contact", "description": "what to do", "rationale": "why AI recommends this" }
   ],
+  "missedAppointments": [
+    { "title": "visit type/reason", "date": "exact date mentioned", "location": "clinic/location if mentioned", "reason": "reason for no-show or cancellation if mentioned" }
+  ]
 }
 
 Rules:
@@ -96,7 +99,13 @@ Rules:
   * priority: "High Priority", "Medium Priority", or "Low Priority" based on urgency
   * timeframe: "Within 24 hours", "Within 48 hours", "Within 1 week", or "During next contact"
   * description: 1-2 sentences on what to do
-  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings`
+  * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings
+- missedAppointments: Extract ALL missed follow-ups, no-shows, and cancelled appointments from the care gap text. For each include:
+  * title: visit type or reason (e.g. "Endocrinology Follow-Up", "Diabetic Foot Screening", "Lab Work")
+  * date: the exact date mentioned (e.g. "Nov 10, 2024", "Mar 13, 2026")
+  * location: clinic or location name if mentioned, otherwise ""
+  * reason: reason for no-show/cancellation if mentioned, otherwise ""
+  * Include EVERY missed/cancelled appointment mentioned. Do NOT skip any.`
 
   const userContent = inputText
 
@@ -172,6 +181,51 @@ function parseMedsFromFhir(bundle) {
   }
   meds.sort((a, b) => (b.authored || '').localeCompare(a.authored || ''))
   return meds.length ? meds : null
+}
+
+function parseEncountersFromFhir(bundle) {
+  if (!bundle?.entry?.length) return null
+  const encounters = []
+  for (const e of bundle.entry) {
+    const r = e.resource
+    if (r.resourceType !== 'Encounter') continue
+    const type = r.type?.[0]?.coding?.[0]?.display || r.type?.[0]?.text || 'Encounter'
+    const status = r.status || ''
+    const cls = r.class?.display || r.class?.code || ''
+    const startDate = r.period?.start || ''
+    const locations = (r.location || []).map(l => l.location?.display || '').filter(Boolean)
+    const reason = r.reasonCode?.[0]?.coding?.[0]?.display || r.reasonCode?.[0]?.text || ''
+    const isNoShow = locations.some(l => l.toUpperCase().includes('NO SHOW') || l.toUpperCase().includes('N/A'))
+    const isCancelled = status === 'cancelled'
+    const isMissed = isNoShow || isCancelled
+
+    let dateStr = ''
+    let timeStr = ''
+    if (startDate) {
+      const d = new Date(startDate)
+      if (!isNaN(d)) {
+        dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      }
+    }
+
+    let apptStatus = 'completed'
+    if (isMissed) apptStatus = 'missed'
+    else if (status === 'planned' || status === 'arrived' || status === 'in-progress') apptStatus = 'upcoming'
+
+    encounters.push({
+      title: type || reason || 'Appointment',
+      status: apptStatus,
+      with: reason || cls || type,
+      date: dateStr,
+      time: timeStr,
+      location: locations.join(', ') || '',
+      isMissed,
+      rawDate: startDate
+    })
+  }
+  encounters.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || ''))
+  return encounters.length ? encounters : null
 }
 
 function parsePatientFromResource(resource, patientId) {
@@ -344,6 +398,8 @@ function DashboardPage() {
   const [trendsData, setTrendsData] = useState(null)
   const [aiActionsData, setAiActionsData] = useState(null)
   const [medsData, setMedsData] = useState(null)
+  const [encData, setEncData] = useState(null)
+  const [missedAppts, setMissedAppts] = useState(null)
   const [showAllMeds, setShowAllMeds] = useState(false)
   const [isReviewed, setIsReviewed] = useState(false)
   const [selectedActions, setSelectedActions] = useState([])
@@ -386,16 +442,22 @@ function DashboardPage() {
 
       if (loadStepRef.current) loadStepRef.current(1)
 
-      // Fetch MedicationRequests directly from FHIR
-      const fhirDirectPromise = callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 }))
-        .then(medBundle => {
-          const parsedMeds = parseMedsFromFhir(medBundle)
-          if (parsedMeds?.length) {
-            console.log('[Dashboard] Parsed', parsedMeds.length, 'medications from FHIR MedicationRequest')
-            setMedsData(parsedMeds)
-          }
-        })
-        .catch(e => console.warn('[Dashboard] Meds fetch failed:', e))
+      // Fetch MedicationRequests + Encounters directly from FHIR
+      const fhirDirectPromise = Promise.all([
+        callFhirApi(buildUrl('/baseR4/MedicationRequest', { subject: patientId, page: 0 })).catch(e => { console.warn('[Dashboard] Meds fetch failed:', e); return null }),
+        callFhirApi(`${FHIR_BASE}/baseR4/Encounter?subject=${patientId}&page=0`).catch(e => { console.warn('[Dashboard] Encounters fetch failed:', e); return null })
+      ]).then(([medBundle, encBundle]) => {
+        const parsedMeds = parseMedsFromFhir(medBundle)
+        if (parsedMeds?.length) {
+          console.log('[Dashboard] Parsed', parsedMeds.length, 'medications from FHIR')
+          setMedsData(parsedMeds)
+        }
+        const parsedEnc = parseEncountersFromFhir(encBundle)
+        if (parsedEnc?.length) {
+          console.log('[Dashboard] Parsed', parsedEnc.length, 'encounters from FHIR')
+          setEncData(parsedEnc)
+        }
+      })
 
       try {
         const careGapText = sessionStorage.getItem('dashboard_caregap_' + patientId)
@@ -422,6 +484,7 @@ function DashboardPage() {
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
         if (aiResult?.aiActions) setAiActionsData(aiResult.aiActions)
+        if (aiResult?.missedAppointments?.length) setMissedAppts(aiResult.missedAppointments)
       } catch (e) {
         console.error('[Dashboard] AI analysis failed:', e)
       }
@@ -768,24 +831,50 @@ function DashboardPage() {
           {/* Appointments */}
           <div id="appts-section" className="dash-card">
             <div className="dash-card-head">
-              <h3>Appointments</h3>
-              <p>Upcoming and recent visits</p>
+              <h3>Appointments &amp; Encounters</h3>
+              <p>{(() => {
+                const enc = encData || []
+                const missed = missedAppts || []
+                const total = enc.length + missed.length
+                return total ? `${total} encounters` : 'Upcoming and recent visits'
+              })()}</p>
             </div>
-            {d.appointments.map((a, i) => (
-              <div key={i} className="dash-appt-row">
-                <div className="dash-appt-info">
-                  <div className="dash-appt-title">
-                    <strong>{a.title}</strong>
-                    <span className={`dash-pill pill-${a.status}`}>{a.status === 'upcoming' ? 'Upcoming' : 'Completed'}</span>
-                    {a.telehealth && <span className="dash-pill pill-telehealth">📹 Telehealth</span>}
+            {(() => {
+              const fhirEnc = encData || []
+              const missed = (missedAppts || []).map(m => ({
+                title: m.title, status: 'missed', with: m.reason || 'No-Show',
+                date: m.date, time: '', location: m.location || '', isMissed: true
+              }))
+              const allAppts = fhirEnc.length || missed.length
+                ? [...missed, ...fhirEnc.filter(e => !e.isMissed), ...fhirEnc.filter(e => e.isMissed)]
+                : d.appointments.map(a => ({ ...a, isMissed: false }))
+              const deduped = []
+              const seen = new Set()
+              for (const a of allAppts) {
+                const key = `${a.title}|${a.date}`
+                if (!seen.has(key)) { seen.add(key); deduped.push(a) }
+              }
+              return deduped.map((a, i) => (
+                <div key={i} className={`dash-appt-row ${a.isMissed ? 'missed' : ''}`}>
+                  <div className="dash-appt-info">
+                    <div className="dash-appt-title">
+                      <strong>{a.title}</strong>
+                      {a.isMissed
+                        ? <span className="dash-pill pill-missed">Missed</span>
+                        : <span className={`dash-pill pill-${a.status}`}>{a.status === 'upcoming' ? 'Upcoming' : a.status === 'completed' ? 'Completed' : a.status}</span>
+                      }
+                      {a.telehealth && <span className="dash-pill pill-telehealth">📹 Telehealth</span>}
+                    </div>
+                    {a.with && <p>{a.isMissed ? a.with : `with ${a.with}`}</p>}
+                    <p className="dash-appt-meta">
+                      {a.date && <>📅 {a.date}</>}
+                      {a.time && <>&nbsp; ⏰ {a.time}</>}
+                      {a.location && <>&nbsp; 📍 {a.location}</>}
+                    </p>
                   </div>
-                  <p>with {a.with}</p>
-                  <p className="dash-appt-meta">
-                    📅 {a.date} &nbsp; ⏰ {a.time} {a.location && <>&nbsp; 📍 {a.location}</>}
-                  </p>
                 </div>
-              </div>
-            ))}
+              ))
+            })()}
           </div>
         </div>
 
