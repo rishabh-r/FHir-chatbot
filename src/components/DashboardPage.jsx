@@ -75,9 +75,6 @@ Return ONLY valid JSON (no markdown fences, no explanation). Use this exact stru
   "aiActions": [
     { "title": "action title", "priority": "High Priority|Medium Priority|Low Priority", "timeframe": "Within 24 hours|Within 48 hours|Within 1 week|During next contact", "description": "what to do", "rationale": "why AI recommends this" }
   ],
-  "vitals": [
-    { "name": "VITAL NAME", "value": "numeric value", "unit": "unit", "normal": "normal range", "status": "elevated|low|normal|critical" }
-  ],
   "medications": [
     { "name": "Drug Name", "dose": "dose", "frequency": "how often", "status": "Active|On-hold|Discontinued", "note": "relevant note if any" }
   ]
@@ -103,13 +100,6 @@ Rules:
   * timeframe: "Within 24 hours", "Within 48 hours", "Within 1 week", or "During next contact"
   * description: 1-2 sentences on what to do
   * rationale: 1-2 sentences on why AI recommends this, referencing specific care gap findings
-- vitals: Extract the LATEST observation/vital values mentioned. Include:
-  * name: uppercase (BLOOD PRESSURE, HEART RATE, BLOOD GLUCOSE, HBA1C, CREATININE, TEMPERATURE, etc.)
-  * value: the latest numeric value mentioned
-  * unit: the unit (mmHg, bpm, mg/dL, %, °F, etc.)
-  * normal: normal range (e.g. "120/80", "60-100", "<5.6%")
-  * status: "critical" if dangerously abnormal, "elevated" if above normal, "low" if below normal, "normal" if within range
-  * Include ALL observations mentioned with their latest values. Skip normals only if not mentioned.
 - medications: Extract ALL medications mentioned in the text. Include:
   * name: drug name (e.g. Metformin, Empagliflozin, Insulin Glargine, Aspirin, Gabapentin, Furosemide, etc.)
   * dose: dosage if mentioned (e.g. "500mg", "10mg"), or "" if unknown
@@ -163,6 +153,104 @@ Rules:
     cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
   }
   return JSON.parse(cleaned)
+}
+
+const KNOWN_NORMALS = {
+  'BLOOD PRESSURE': '120/80 mmHg', 'SYSTOLIC BLOOD PRESSURE': '90-120 mmHg', 'DIASTOLIC BLOOD PRESSURE': '60-80 mmHg',
+  'HEART RATE': '60-100 bpm', 'BODY TEMPERATURE': '97-99 °F', 'TEMPERATURE': '97-99 °F',
+  'RESPIRATORY RATE': '12-20 /min', 'OXYGEN SATURATION': '95-100 %', 'SPO2': '95-100 %',
+  'BLOOD GLUCOSE': '70-130 mg/dL', 'GLUCOSE': '70-130 mg/dL', 'FASTING GLUCOSE': '70-100 mg/dL',
+  'HBA1C': '<5.7 %', 'HEMOGLOBIN A1C': '<5.7 %', 'GLYCATED HEMOGLOBIN': '<5.7 %',
+  'HEMOGLOBIN': '12-17 g/dL', 'CREATININE': '0.6-1.2 mg/dL', 'SERUM CREATININE': '0.6-1.2 mg/dL',
+  'BUN': '7-20 mg/dL', 'BLOOD UREA NITROGEN': '7-20 mg/dL', 'EGFR': '>60 mL/min',
+  'POTASSIUM': '3.5-5.0 mEq/L', 'SODIUM': '136-145 mEq/L', 'CALCIUM': '8.5-10.5 mg/dL',
+  'CHOLESTEROL': '<200 mg/dL', 'TOTAL CHOLESTEROL': '<200 mg/dL',
+  'LDL': '<100 mg/dL', 'HDL': '>40 mg/dL', 'TRIGLYCERIDES': '<150 mg/dL',
+  'BMI': '18.5-24.9 kg/m²', 'BODY MASS INDEX': '18.5-24.9 kg/m²',
+  'WEIGHT': '', 'HEIGHT': '', 'BODY WEIGHT': '', 'BODY HEIGHT': '',
+  'WBC': '4500-11000 /µL', 'WHITE BLOOD CELLS': '4500-11000 /µL',
+  'PLATELETS': '150000-400000 /µL', 'ALT': '7-56 U/L', 'AST': '10-40 U/L',
+  'ALBUMIN': '3.5-5.5 g/dL', 'TSH': '0.4-4.0 mIU/L', 'URINE PROTEIN': 'Negative',
+}
+
+function determineVitalStatus(name, value) {
+  const upper = name.toUpperCase()
+  const num = parseFloat(String(value).replace(/[^\d.-]/g, ''))
+  if (isNaN(num)) return 'normal'
+  if (upper.includes('HBA1C') || upper.includes('GLYCATED')) {
+    if (num >= 10) return 'critical'
+    if (num >= 7) return 'elevated'
+    return num <= 5.7 ? 'normal' : 'elevated'
+  }
+  if (upper.includes('GLUCOSE')) {
+    if (num > 300 || num < 50) return 'critical'
+    if (num > 130 || num < 70) return 'elevated'
+    return 'normal'
+  }
+  if (upper.includes('CREATININE')) {
+    if (num > 3) return 'critical'
+    if (num > 1.2) return 'elevated'
+    return 'normal'
+  }
+  if (upper.includes('SYSTOLIC') || (upper.includes('BLOOD PRESSURE') && !upper.includes('DIASTOLIC'))) {
+    if (num >= 180) return 'critical'
+    if (num >= 140) return 'elevated'
+    if (num < 90) return 'low'
+    return 'normal'
+  }
+  if (upper.includes('POTASSIUM')) {
+    if (num < 3.0 || num > 6.0) return 'critical'
+    if (num < 3.5 || num > 5.0) return 'elevated'
+    return 'normal'
+  }
+  if (upper.includes('EGFR')) {
+    if (num < 15) return 'critical'
+    if (num < 60) return 'elevated'
+    return 'normal'
+  }
+  return 'normal'
+}
+
+function parseVitalsFromObservations(bundle) {
+  if (!bundle?.entry?.length) return null
+  const latest = {}
+  for (const e of bundle.entry) {
+    const r = e.resource
+    if (r.resourceType !== 'Observation') continue
+    const code = r.code?.coding?.[0]?.display || r.code?.text || ''
+    if (!code) continue
+    const date = r.effectiveDateTime || r.issued || ''
+    let value = ''
+    let unit = ''
+    if (r.valueQuantity) {
+      value = String(r.valueQuantity.value ?? '')
+      unit = r.valueQuantity.unit || r.valueQuantity.code || ''
+    } else if (r.valueString) {
+      value = r.valueString
+    } else if (r.component?.length) {
+      const parts = r.component.map(c => {
+        const cv = c.valueQuantity ? `${c.valueQuantity.value}` : ''
+        return cv
+      }).filter(Boolean)
+      if (parts.length === 2) value = `${parts[0]}/${parts[1]}`
+      unit = r.component[0]?.valueQuantity?.unit || 'mmHg'
+    }
+    if (!value) continue
+    const refText = r.referenceRange?.[0]?.text || ''
+    const key = code.toUpperCase()
+    if (!latest[key] || date > latest[key].date) {
+      latest[key] = { name: key, value, unit, date, normal: refText || KNOWN_NORMALS[key] || '', code }
+    }
+  }
+  return Object.values(latest)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .map(v => ({
+      name: v.name,
+      value: v.value,
+      unit: v.unit,
+      normal: v.normal,
+      status: determineVitalStatus(v.name, v.value)
+    }))
 }
 
 function parsePatientFromResource(resource, patientId) {
@@ -378,6 +466,17 @@ function DashboardPage() {
 
       if (loadStepRef.current) loadStepRef.current(1)
 
+      // Always fetch Observations from FHIR for vitals (chatbot text doesn't include numeric values)
+      const vitalsPromise = callFhirApi(buildUrl('/baseR4/Observations', { subject: patientId, page: 0 }))
+        .then(obsBundle => {
+          const parsed = parseVitalsFromObservations(obsBundle)
+          if (parsed?.length) {
+            console.log('[Dashboard] Parsed', parsed.length, 'vitals from FHIR Observations')
+            setVitalsData(parsed)
+          }
+        })
+        .catch(e => console.warn('[Dashboard] Vitals fetch failed:', e))
+
       try {
         const careGapText = sessionStorage.getItem('dashboard_caregap_' + patientId)
 
@@ -403,11 +502,12 @@ function DashboardPage() {
         if (aiResult?.alerts) setAlertsData(aiResult.alerts)
         if (aiResult?.trends) setTrendsData(aiResult.trends)
         if (aiResult?.aiActions) setAiActionsData(aiResult.aiActions)
-        if (aiResult?.vitals) setVitalsData(aiResult.vitals)
         if (aiResult?.medications) setMedsData(aiResult.medications)
       } catch (e) {
         console.error('[Dashboard] AI analysis failed:', e)
       }
+
+      await vitalsPromise
     }
 
     Promise.all([loadDashboard(), minLoadTime]).then(() => setIsLoading(false))
