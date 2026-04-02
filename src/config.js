@@ -417,24 +417,32 @@ Step 3: Present all matching patients returned in the response with their releva
 
 
 **search_patient_encounter:**
+
+IMPORTANT — For ALL encounter queries (date range, recent period, general "give encounters", "show encounters", etc.), ALWAYS present results grouped into two sections:
+  - **Inpatient Encounters (IMP):** all encounters where class.code = "IMP"
+  - **Outpatient / OPD Encounters (AMB):** all encounters where class.code = "AMB"
+For each encounter show full details: date, type/reason, doctor, location, status. Never show a flat ungrouped list.
+
 1. Date Range Search
 When the user asks for encounters between specific dates (e.g. "Show encounters from 13th Jan 2000 to 13th Jan 2024"):
 
 Step 1: Pass first DATE parameter as gt{start_date} (e.g. gt2000-01-13) and second DATE parameter as lt{end_date} (e.g. lt2024-01-13)
-Step 2: Display all encounters returned with date, type, reason, doctor, and location
-Step 3: After displaying, ask: "There may be more encounters. Would you like to see more?"
-Step 4: If user says yes — call again with page=1, display all results returned on that page, then ask again
-Step 5: Continue with page=2, page=3 and so on until the user says no or no more data is returned
+Step 2: Separate results into two groups — class.code = "IMP" (Inpatient) and class.code = "AMB" (Outpatient)
+Step 3: Present results in two clearly labeled sections with full details for each encounter
+Step 4: After displaying, ask: "There may be more encounters. Would you like to see more?"
+Step 5: If user says yes — call again with page=1, display all results returned on that page under the same two sections, then ask again
+Step 6: Continue with page=2, page=3 and so on until the user says no or no more data is returned
 
 2. Recent Period Search
-When the user asks for encounters over a recent period (e.g. "Show encounters from the last 6 months"):
+When the user asks for encounters over a recent period (e.g. "Show encounters from the last 6 months", "give last 12 months encounters", "recent encounters"):
 
 Step 1: Calculate the start date by subtracting the requested period from today's date (e.g. today is ${today}, last 6 months → start date is calculated accordingly)
 Step 2: Pass first DATE parameter as gt{start_date} and second DATE parameter as lt{today} (e.g. lt${today})
-Step 3: Display all encounters returned with date, type, reason, doctor, and location
-Step 4: After displaying, ask: "There may be more encounters. Would you like to see more?"
-Step 5: If user says yes — call again with page=1, display all results returned on that page, then ask again
-Step 6: Continue with page=2, page=3 and so on until the user says no or no more data is returned
+Step 3: Separate results into two groups — class.code = "IMP" (Inpatient) and class.code = "AMB" (Outpatient)
+Step 4: Present results in two clearly labeled sections with full details for each encounter
+Step 5: After displaying, ask: "There may be more encounters. Would you like to see more?"
+Step 6: If user says yes — call again with page=1, display all results returned on that page under the same two sections, then ask again
+Step 7: Continue with page=2, page=3 and so on until the user says no or no more data is returned
 
 
 Note: No SUBJECT parameter is needed for cross-patient date-based searches.
