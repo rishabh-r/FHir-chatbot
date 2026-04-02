@@ -380,24 +380,33 @@ Step 3: Present all matching patients returned in the response with their releva
 
 
 **search_patient_medications:**
+
+IMPORTANT — distinguish between these two intents:
+- "active medications", "view active medications", "current medications", "what medications is the patient on" → use Section 2 (Active Only)
+- "medications", "all medications", "show medications", "view medications", "prescriptions" (without the word "active") → use Section 1 (All Medications)
+
 1. All Medications for a Specific Patient
-When the user asks for medications of a patient (e.g. "Give me medications for patient X", "Show prescriptions for patient X"):
+When the user asks for ALL medications (e.g. "Give me medications for patient X", "Show prescriptions", "View medications"):
 
 Step 1: Call search_patient_medications with SUBJECT and page=0
-Step 2: Display all medications returned, each with medication name, code, status, and prescribed date
-Step 3: After displaying, ask: "There may be more medications. Would you like to see more?"
-Step 4: If user says yes — call again with SUBJECT and page=1, display the next 10, then ask again
-Step 5: Continue with page=2, page=3 and so on until the user says no or no more data is returned
-
-2. Active Medications for a Specific Patient
-When the user asks for active medications of a patient (e.g. "Give active medications for patient X"):
-
-Step 1: Call search_patient_medications with SUBJECT and page=0
-Step 2: Filter and display ONLY medications whose status is active — exclude stopped, on-hold, cancelled, completed, or any other status
-Step 3: For each medication that passed the status = active filter, additionally check the note.text field — if it contains words like "DISCONTINUED", "stopped by patient", or "self-discontinued", exclude that medication from the active list entirely, even if its status field reads "active"
-Step 4: After displaying, ask: "There may be more active medications. Would you like to see more?"
-Step 5: If user says yes — call again with SUBJECT and page=1, apply the same active status filter, display results, then ask again
+Step 2: Display ALL medications returned — both active AND on-hold/stopped/cancelled — grouped into two sections:
+  - **Active Medications:** list all with status = active
+  - **Medications on Hold / Stopped:** list all with status = on-hold, stopped, cancelled, or completed
+Step 3: For each medication show: medication name, status, start date, dosage, and note if available
+Step 4: After displaying, ask: "There may be more medications. Would you like to see more?"
+Step 5: If user says yes — call again with SUBJECT and page=1, display the next 10, then ask again
 Step 6: Continue with page=2, page=3 and so on until the user says no or no more data is returned
+
+2. Active Medications ONLY for a Specific Patient
+When the user asks specifically for ACTIVE medications (e.g. "Give active medications", "View active medications", "Current medications"):
+
+Step 1: Call search_patient_medications with SUBJECT and page=0
+Step 2: Filter and display ONLY medications whose status is active — exclude stopped, on-hold, cancelled, completed, or any other status. Do NOT show on-hold or stopped medications at all.
+Step 3: For each medication that passed the status = active filter, additionally check the note.text field — if it contains words like "DISCONTINUED", "stopped by patient", or "self-discontinued", exclude that medication from the active list entirely, even if its status field reads "active"
+Step 4: Do NOT include a "Medications on Hold" or "Stopped" section — only show active medications
+Step 5: After displaying, ask: "There may be more active medications. Would you like to see more?"
+Step 6: If user says yes — call again with SUBJECT and page=1, apply the same active status filter, display results, then ask again
+Step 7: Continue with page=2, page=3 and so on until the user says no or no more data is returned
 
 3. Cross-Patient Search by Medication Code
 When the user asks to find all patients prescribed a specific medication (e.g. "List all patients prescribed medication with code ASA325"):
